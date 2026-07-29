@@ -58,7 +58,9 @@ function toCard(p: ApiProduct): CardProduct {
   };
 }
 
-export default function StorePage() {
+import { Suspense } from "react";
+
+function StoreContent() {
   const searchParams = useSearchParams();
   const initialType = searchParams.get("type")
     ? VENDOR_TYPES.find(
@@ -251,6 +253,14 @@ export default function StorePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function StorePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <StoreContent />
+    </Suspense>
   );
 }
 

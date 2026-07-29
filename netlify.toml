@@ -1,7 +1,7 @@
 [build]
   base    = "merchke_frontend"
   command = "npm install && npm run build"
-  publish = "merchke_frontend/.next"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
