@@ -5,11 +5,24 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/authStore";
 
 const NAV_ITEMS = [
-  { label: "Overview",    icon: "📊", tab: ""        },
+  { label: "Overview",    icon: "📊", tab: ""         },
   { label: "Products",    icon: "📦", tab: "products" },
-  { label: "Orders",      icon: "🧾", tab: "orders"  },
-  { label: "Events",      icon: "🎟️", tab: "events"  },
-  { label: "Payouts",     icon: "💰", tab: "payouts" },
+  { label: "Orders",      icon: "🧾", tab: "orders"   },
+  { label: "Events",      icon: "🎟️", tab: "events"   },
+  { label: "Services",    icon: "💄", tab: "services" },
+  { label: "Jobs",        icon: "💼", tab: "jobs"     },
+  { label: "Ads",         icon: "📣", tab: "ads"      },
+  { label: "Payouts",     icon: "💰", tab: "payouts"  },
+];
+
+const CREATE_LINKS = [
+  { label: "Add Product",    icon: "➕", href: "/dashboard/products/new" },
+  { label: "New Event",      icon: "🎤", href: "/dashboard/events/new" },
+  { label: "List a Service", icon: "✨", href: "/dashboard/services/new" },
+  { label: "Post a Job",     icon: "📝", href: "/dashboard/jobs/new" },
+  { label: "Podcasts",       icon: "🎙️", href: "/dashboard/podcasts/new" },
+  { label: "Advertise",      icon: "📣", href: "/dashboard/ads/new" },
+  { label: "Gate Check-in",  icon: "📷", href: "/dashboard/events/check-in" },
 ];
 
 function SidebarNav({ onClose }: { onClose?: () => void }) {
@@ -25,7 +38,6 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
     onClose?.();
   };
 
-  const isAddProduct = pathname === "/dashboard/add-product";
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}>
@@ -57,7 +69,7 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isOnDash = pathname === "/dashboard";
-          const isActive = !isAddProduct && isOnDash && currentTab === item.tab;
+          const isActive = isOnDash && currentTab === item.tab;
           const href = item.tab ? `/dashboard?tab=${item.tab}` : "/dashboard";
           return (
             <Link
@@ -67,7 +79,7 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={
                 isActive
-                  ? { background: "rgba(139,92,246,0.15)", color: "var(--primary)", borderLeft: "2px solid var(--primary)" }
+                  ? { background: "var(--primary-dim)", color: "var(--primary)", borderLeft: "2px solid var(--primary)" }
                   : { color: "#9ca3af" }
               }
             >
@@ -81,19 +93,22 @@ function SidebarNav({ onClose }: { onClose?: () => void }) {
           <div className="h-px" style={{ background: "var(--border)" }} />
         </div>
 
-        <Link
-          href="/dashboard/add-product"
-          onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all"
-          style={
-            isAddProduct
-              ? { background: "var(--primary)", color: "#fff" }
-              : { background: "rgba(139,92,246,0.12)", color: "var(--primary)" }
-          }
-        >
-          <span className="text-base">➕</span>
-          Add Product
-        </Link>
+        <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-600">Create</p>
+        {CREATE_LINKS.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+              style={active ? { background: "var(--primary)", color: "#fff" } : { color: "#9ca3af" }}
+            >
+              <span className="text-base" aria-hidden>{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Bottom section */}
@@ -127,17 +142,18 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.replace("/login?next=/dashboard");
     } else if (isAuthenticated && !user?.is_vendor) {
       router.replace("/store");
     }
-  }, [isAuthenticated, user, router]);
+  }, [hasHydrated, isAuthenticated, user, router]);
 
   if (!isAuthenticated || !user?.is_vendor) return null;
 

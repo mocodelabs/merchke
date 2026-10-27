@@ -5,12 +5,8 @@ import Link from "next/link";
 import { wishlistApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/authStore";
 import { useCart } from "@/components/CartProvider";
+import { mediaUrl } from "@/lib/config";
 
-function mediaUrl(path: string | null | undefined): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace("/api", "") + path;
-}
 
 type WishlistItem = {
   id: number;
@@ -37,7 +33,7 @@ function StarRow({ rating }: { rating: number }) {
 }
 
 export default function WishlistPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, hasHydrated } = useAuthStore();
   const router = useRouter();
   const { addItem } = useCart();
 
@@ -47,6 +43,7 @@ export default function WishlistPage() {
   const [addedToCart, setAddedToCart] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       router.replace("/login?next=/wishlist");
       return;
@@ -55,7 +52,7 @@ export default function WishlistPage() {
       .then((res) => setItems(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, router]);
 
   if (!isAuthenticated) return null;
 

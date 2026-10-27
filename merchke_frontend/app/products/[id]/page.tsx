@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { useAuthStore } from "@/lib/authStore";
 import api, { reviewApi, productApi, reportApi } from "@/lib/api";
+import { mediaUrl } from "@/lib/config";
 
 type ProductImage = { id: number; image: string; alt_text: string; is_primary: boolean };
 type ProductVariant = {
@@ -26,12 +27,6 @@ type ApiProduct = {
   has_digital_file: boolean; download_limit: number | null;
 };
 
-function mediaUrl(path: string | null | undefined): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace("/api", "");
-  return `${base}${path}`;
-}
 
 function StarRow({ rating, size = "w-4 h-4" }: { rating: number; size?: string }) {
   return (
@@ -69,7 +64,6 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
     Promise.all([
       api.get(`/products/${id}/`),
       reviewApi.listProduct(id),
@@ -112,20 +106,19 @@ export default function ProductDetailPage() {
       alert("Please select a variant");
       return;
     }
-    for (let i = 0; i < qty; i++) {
-      addItem({
-        id: product.id,
-        name: product.name,
-        price: effectivePrice,
-        image: mediaUrl(allImages[0]),
-        vendor: product.vendor_name,
-        variant: selectedVariant
-          ? [selectedVariant.size, selectedVariant.color, selectedVariant.custom_label]
-              .filter(Boolean)
-              .join(" / ")
-          : undefined,
-      });
-    }
+    addItem({
+      id: product.id,
+      variantId: selectedVariant?.id ?? null,
+      name: product.name,
+      price: effectivePrice,
+      image: mediaUrl(allImages[0]),
+      vendor: product.vendor_name,
+      variant: selectedVariant
+        ? [selectedVariant.size, selectedVariant.color, selectedVariant.custom_label]
+            .filter(Boolean)
+            .join(" / ")
+        : undefined,
+    }, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };

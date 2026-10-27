@@ -213,13 +213,13 @@ export default function HowItWorksPage() {
           style={{ background: "var(--primary-dim)", color: "var(--primary)", border: "1px solid rgba(249,115,22,0.25)" }}
         >
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--primary)" }} />
-          Kenya's Creative Marketplace
+          Kenya&apos;s Creative Marketplace
         </div>
         <h1 className="text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
           How Merchke Works
         </h1>
         <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          Merchke connects Kenya's artists, DJs, brands, and event organisers with their fans.
+          Merchke connects Kenya&apos;s artists, DJs, brands, and event organisers with their fans.
           Buy and sell merch, digital products, and event tickets — all paid via M-Pesa.
         </p>
       </div>
@@ -310,7 +310,7 @@ export default function HowItWorksPage() {
                 <div>
                   <h3 className="text-lg font-bold text-white mb-2">Everything in one place</h3>
                   <p className="text-sm text-gray-400 leading-relaxed">
-                    One account, one cart, one M-Pesa payment — whether you're buying a jersey, a beat pack, or a concert ticket.
+                    One account, one cart, one M-Pesa payment — whether you&apos;re buying a jersey, a beat pack, or a concert ticket.
                   </p>
                 </div>
                 <div className="space-y-3 mt-auto">
@@ -348,7 +348,7 @@ export default function HowItWorksPage() {
                 <div>
                   <h3 className="text-lg font-bold text-white mb-2">Built for Kenyan creators</h3>
                   <p className="text-sm text-gray-400 leading-relaxed">
-                    Whether you're a solo artist, a DJ, a local brand, or an event organiser — Merchke gives you the tools to monetise what you create.
+                    Whether you&apos;re a solo artist, a DJ, a local brand, or an event organiser — Merchke gives you the tools to monetise what you create.
                   </p>
                 </div>
                 <div className="space-y-3 mt-auto">
@@ -400,7 +400,7 @@ export default function HowItWorksPage() {
           <div className="flex-1">
             <h2 className="text-xl font-black text-white mb-3">Payments via M-Pesa</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-5">
-              Every transaction on Merchke — whether you're buying a cap or selling 100 event tickets — goes through M-Pesa.
+              Every transaction on Merchke — whether you&apos;re buying a cap or selling 100 event tickets — goes through M-Pesa.
               No credit card, no bank account, no foreign payment gateway fees. Just your Safaricom line.
             </p>
             <div className="grid sm:grid-cols-3 gap-4">
@@ -447,7 +447,7 @@ export default function HowItWorksPage() {
       <div className="mb-20">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-black text-white mb-2">Frequently asked questions</h2>
-          <p className="text-gray-500 text-sm">Can't find an answer? <Link href="/contact" className="underline" style={{ color: "var(--primary)" }}>Contact us</Link></p>
+          <p className="text-gray-500 text-sm">Can&apos;t find an answer? <Link href="/contact" className="underline" style={{ color: "var(--primary)" }}>Contact us</Link></p>
         </div>
         <div className="space-y-3 max-w-2xl mx-auto">
           {FAQS.map((faq) => (

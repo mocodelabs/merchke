@@ -18,7 +18,7 @@ class VendorSerializer(serializers.ModelSerializer):
             'id', 'user', 'vendor_type',
             'brand_name', 'store_name', 'slug', 'bio', 'tagline',
             'profile_image', 'logo', 'banner',
-            'contact_email', 'phone_number',
+            'contact_email', 'phone_number', 'mpesa_phone',
             'instagram_handle', 'twitter_handle', 'tiktok_handle', 'website',
             'location', 'county',
             'payout_method', 'payout_account',
