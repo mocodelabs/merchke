@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { vendorApi, productApi } from "@/lib/api";
+import { mediaUrl } from "@/lib/config";
 
 const TYPE_EMOJI: Record<string, string> = {
   artist: "🎨", dj: "🎧", creative: "🎭",
@@ -30,12 +31,6 @@ type ApiProduct = {
   is_featured: boolean; product_type: string; sales_count: number;
 };
 
-function mediaUrl(path: string | null | undefined): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace("/api", "");
-  return `${base}${path}`;
-}
 
 function toCard(p: ApiProduct) {
   return {

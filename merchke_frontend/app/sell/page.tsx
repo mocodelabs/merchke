@@ -82,7 +82,7 @@ function SellPageInner() {
           Start selling on Merchke
         </h1>
         <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          Kenya's marketplace for creatives. Sell merch, digital products, and event tickets to your audience — paid straight to your M-Pesa.
+          Kenya&apos;s marketplace for creatives. Sell merch, digital products, and event tickets to your audience — paid straight to your M-Pesa.
         </p>
         <div className="flex justify-center gap-3 mt-8">
           <Link

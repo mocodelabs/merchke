@@ -17,6 +17,9 @@ const SELLER_TYPES = [
   { icon: "🏷️", label: "Local Brand", value: "brand", desc: "Clothing, accessories, lifestyle" },
   { icon: "🎟️", label: "Event Organizer", value: "events", desc: "Sell tickets for your events" },
   { icon: "📲", label: "Digital Products", value: "digital", desc: "Beats, presets, e-books" },
+  { icon: "💄", label: "Makeup Artist", value: "makeup", desc: "Products, bookings, tutorials" },
+  { icon: "🖋️", label: "Tattoo Artist", value: "tattoo", desc: "Flash art prints, booking deposits" },
+  { icon: "🏍️", label: "Biker / Moto Culture", value: "biker", desc: "Gear, accessories, ride tickets" },
 ];
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -42,9 +45,10 @@ function RegisterContent() {
 
   const nextPath = searchParams.get("next") || "";
   const presetSeller = searchParams.get("seller") === "1";
+  const presetType = searchParams.get("type") || "";
 
-  const [accountType, setAccountType] = useState<AccountType>(presetSeller ? "seller" : "buyer");
-  const [vendorType, setVendorType] = useState("");
+  const [accountType, setAccountType] = useState<AccountType>(presetSeller || presetType ? "seller" : "buyer");
+  const [vendorType, setVendorType] = useState(SELLER_TYPES.some((t) => t.value === presetType) ? presetType : "");
   const [agreed, setAgreed] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [showPw2, setShowPw2] = useState(false);

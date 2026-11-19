@@ -1,4 +1,7 @@
+import uuid
+
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 from vendors.models import Vendor
 
@@ -8,6 +11,16 @@ EVENT_STATUS_CHOICES = [
     ('sold_out', 'Sold Out'),
     ('cancelled', 'Cancelled'),
     ('completed', 'Completed'),
+]
+
+EVENT_CATEGORY_CHOICES = [
+    ('concert', 'Concert / Party'),
+    ('tournament', 'Football / Tournament'),
+    ('comedy', 'Comedy'),
+    ('podcast_live', 'Live Podcast'),
+    ('exhibition', 'Exhibition / Show'),
+    ('ride', 'Bike Ride / Moto Show'),
+    ('other', 'Other'),
 ]
 
 
@@ -31,6 +44,7 @@ class Event(models.Model):
     end_datetime = models.DateTimeField(null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=EVENT_STATUS_CHOICES, default='draft')
+    category = models.CharField(max_length=20, choices=EVENT_CATEGORY_CHOICES, default='concert')
     is_featured = models.BooleanField(default=False)
 
     # Categories/genres for discoverability
@@ -62,7 +76,17 @@ class Event(models.Model):
 
     @property
     def is_sold_out(self):
-        return all(t.is_sold_out for t in self.ticket_types.all())
+        types = list(self.ticket_types.all())
+        return bool(types) and all(t.is_sold_out for t in types)
+
+    @property
+    def min_price(self):
+        prices = [t.price for t in self.ticket_types.all()]
+        return min(prices) if prices else None
+
+    @property
+    def is_past(self):
+        return (self.end_datetime or self.start_datetime) < timezone.now()
 
 
 class TicketType(models.Model):
@@ -93,6 +117,10 @@ class Ticket(models.Model):
     order_item = models.ForeignKey(
         'orders.OrderItem', on_delete=models.CASCADE, related_name='tickets', null=True, blank=True
     )
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.CASCADE, related_name='tickets', null=True, blank=True
+    )
+    qr_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     buyer = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='tickets')
     ticket_number = models.CharField(max_length=30, unique=True, blank=True)
     qr_code = models.ImageField(upload_to='tickets/qr/', blank=True, null=True)
@@ -103,8 +131,35 @@ class Ticket(models.Model):
     def __str__(self):
         return self.ticket_number or f"Ticket #{self.pk}"
 
+    @staticmethod
+    def new_ticket_number():
+        return 'TKT' + uuid.uuid4().hex[:10].upper()
+
     def save(self, *args, **kwargs):
         if not self.ticket_number:
-            import uuid
-            self.ticket_number = 'TKT' + uuid.uuid4().hex[:8].upper()
+            self.ticket_number = self.new_ticket_number()
         super().save(*args, **kwargs)
+
+
+class EventAd(models.Model):
+    """Paid promotion for an event: features it on the homepage/events pages."""
+    PAYMENT_STATUS_CHOICES = [('pending', 'Pending'), ('paid', 'Paid'), ('failed', 'Failed')]
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='ads')
+    ad_image = models.ImageField(upload_to='events/ads/', blank=True, null=True)
+    ad_copy = models.CharField(max_length=200, blank=True)
+    budget_ksh = models.PositiveIntegerField()
+    days = models.PositiveIntegerField(default=7)
+    impressions = models.PositiveIntegerField(default=0)
+    clicks = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=False)
+    payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Boost: {self.event.title} (KSh {self.budget_ksh})"

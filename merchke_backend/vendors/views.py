@@ -1,10 +1,12 @@
+from core.permissions import IsVendor
 from rest_framework import generics, permissions, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models.functions import TruncMonth
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
+from django.utils import timezone
 from datetime import datetime
 from collections import OrderedDict
 
@@ -37,9 +39,6 @@ class VendorDetailBySlugView(generics.RetrieveAPIView):
     queryset = Vendor.objects.filter(is_active=True)
 
 
-class IsVendor(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.is_vendor
 
 
 class VendorProfileView(generics.RetrieveUpdateAPIView):
@@ -52,42 +51,53 @@ class VendorProfileView(generics.RetrieveUpdateAPIView):
 
 
 class VendorDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsVendor]
 
     def get(self, request):
+        from payments.models import EscrowTransaction
+
         vendor = request.user.vendor_profile
         products = Product.objects.filter(vendor=vendor)
-        # Orders now linked via OrderItem.vendor
-        orders = Order.objects.filter(items__vendor=vendor).distinct()
+        orders = Order.objects.filter(
+            Q(items__vendor=vendor) | Q(escrow__vendor=vendor)
+        ).exclude(status='pending').distinct()
+        escrows = EscrowTransaction.objects.filter(vendor=vendor)
 
-        total_revenue = sum(
-            order.total_amount for order in orders if order.status == 'delivered'
-        )
-        pending_orders = orders.filter(status='pending').count()
+        def total(qs, field):
+            return float(qs.aggregate(t=Sum(field))['t'] or 0)
 
-        current_year = datetime.now().year
-        monthly_data = (
-            orders.filter(created_at__year=current_year)
+        current_year = timezone.now().year
+        monthly = (
+            escrows.filter(created_at__year=current_year)
+            .exclude(status='refunded')
             .annotate(month=TruncMonth('created_at'))
             .values('month')
-            .annotate(order_count=Count('id'), revenue=Sum('total_amount'))
+            .annotate(order_count=Count('id'), revenue=Sum('vendor_amount'))
             .order_by('month')
         )
-
-        stats = OrderedDict()
-        for month in range(1, 13):
-            key = datetime(current_year, month, 1).strftime("%b")
-            stats[key] = {"orders": 0, "revenue": 0}
-
-        for entry in monthly_data:
-            month_str = entry["month"].strftime("%b")
-            stats[month_str]["orders"] = entry["order_count"]
-            stats[month_str]["revenue"] = float(entry["revenue"] or 0)
+        stats = OrderedDict(
+            (datetime(current_year, m, 1).strftime('%b'), {'orders': 0, 'revenue': 0})
+            for m in range(1, 13)
+        )
+        for entry in monthly:
+            stats[entry['month'].strftime('%b')] = {
+                'orders': entry['order_count'],
+                'revenue': float(entry['revenue'] or 0),
+            }
 
         return Response({
-            "products_count": products.count(),
-            "orders_count": orders.count(),
-            "total_revenue": total_revenue,
-            "pending_orders": pending_orders,
-            "monthly_stats": stats,
+            'products_count': products.count(),
+            'pending_listing_fees': products.filter(listing_fee__status='pending').count(),
+            'orders_count': orders.count(),
+            'orders_to_ship': orders.filter(status__in=['confirmed', 'processing']).count(),
+            'earnings': {
+                'released': total(escrows.filter(status='released'), 'vendor_amount'),
+                'held': total(escrows.filter(status='held'), 'vendor_amount'),
+                'disputed': total(escrows.filter(status='disputed'), 'vendor_amount'),
+                'commission_paid': total(escrows.filter(status='released'), 'commission_amount'),
+            },
+            # kept for the existing dashboard cards
+            'total_revenue': total(escrows.filter(status='released'), 'vendor_amount'),
+            'pending_orders': orders.filter(status__in=['confirmed', 'processing']).count(),
+            'monthly_stats': stats,
         })

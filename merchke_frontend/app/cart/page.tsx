@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useCart } from "@/components/CartProvider";
+import { cartKey, useCart } from "@/components/CartProvider";
+import { formatKES } from "@/lib/config";
 
 export default function CartPage() {
   const { items, removeItem, updateQty, total } = useCart();
@@ -22,8 +23,7 @@ export default function CartPage() {
     );
   }
 
-  const delivery = 200;
-  const grandTotal = total + delivery;
+  const sellers = new Set(items.map((i) => i.vendor)).size;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -36,16 +36,19 @@ export default function CartPage() {
         <div className="lg:col-span-2 space-y-4">
           {items.map((item) => (
             <div
-              key={item.id}
+              key={cartKey(item)}
               className="flex gap-4 p-4 rounded-2xl"
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
               {/* Image */}
               <div
-                className="w-20 h-20 rounded-xl shrink-0 flex items-center justify-center text-2xl"
+                className="w-20 h-20 rounded-xl shrink-0 flex items-center justify-center text-2xl overflow-hidden"
                 style={{ background: "var(--surface-2)" }}
               >
-                🛍️
+                {item.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
+                ) : "🛍️"}
               </div>
 
               {/* Details */}
@@ -59,12 +62,12 @@ export default function CartPage() {
                         className="inline-block text-xs px-2 py-0.5 rounded mt-1"
                         style={{ background: "var(--surface-2)", color: "#9ca3af" }}
                       >
-                        Size: {item.variant}
+                        {item.variant}
                       </span>
                     )}
                   </div>
                   <button
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => removeItem(cartKey(item))}
                     className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,21 +83,21 @@ export default function CartPage() {
                     style={{ border: "1px solid var(--border)" }}
                   >
                     <button
-                      onClick={() => updateQty(item.id, item.quantity - 1)}
+                      onClick={() => updateQty(cartKey(item), item.quantity - 1)}
                       className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5"
                     >
                       −
                     </button>
                     <span className="w-8 text-center text-sm font-bold text-white">{item.quantity}</span>
                     <button
-                      onClick={() => updateQty(item.id, item.quantity + 1)}
+                      onClick={() => updateQty(cartKey(item), item.quantity + 1)}
                       className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5"
                     >
                       +
                     </button>
                   </div>
                   <span className="font-bold text-white">
-                    KSh {(item.price * item.quantity).toLocaleString()}
+                    {formatKES(item.price * item.quantity)}
                   </span>
                 </div>
               </div>
@@ -121,19 +124,18 @@ export default function CartPage() {
 
             <div className="space-y-3 mb-5 text-sm">
               <div className="flex justify-between text-gray-400">
-                <span>Subtotal</span>
-                <span className="text-white font-medium">KSh {total.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-gray-400">
                 <span>Delivery</span>
-                <span className="text-white font-medium">KSh {delivery}</span>
+                <span className="text-white font-medium text-right">
+                  KSh 200 per seller{sellers > 1 ? ` (${sellers} sellers)` : ""}
+                  <span className="block text-xs text-gray-600 font-normal">Free for digital items</span>
+                </span>
               </div>
               <div
                 className="flex justify-between pt-3 font-bold text-base"
                 style={{ borderTop: "1px solid var(--border)" }}
               >
-                <span className="text-white">Total</span>
-                <span style={{ color: "var(--primary)" }}>KSh {grandTotal.toLocaleString()}</span>
+                <span className="text-white">Subtotal</span>
+                <span style={{ color: "var(--primary)" }}>{formatKES(total)}</span>
               </div>
             </div>
 

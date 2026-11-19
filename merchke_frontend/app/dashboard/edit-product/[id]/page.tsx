@@ -43,7 +43,7 @@ const inputClass = "w-full px-4 py-3 rounded-xl text-gray-200 outline-none place
 const inputStyle = { background: "var(--surface-2)", border: "1px solid var(--border)" };
 
 export default function EditProductPage() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
   const router = useRouter();
   const params = useParams();
   const productId = Number(params.id);
@@ -85,6 +85,7 @@ export default function EditProductPage() {
   const [newVariants, setNewVariants] = useState<NewVariant[]>([]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated || !user?.is_vendor) {
       router.replace("/login?next=/dashboard");
       return;
@@ -124,12 +125,11 @@ export default function EditProductPage() {
       .then((catRes) => setCategories(catRes.data))
       .catch(() => setError("Failed to load product. It may not exist or belong to you."))
       .finally(() => setLoading(false));
-  }, [isAuthenticated, user, productId, router]);
+  }, [hasHydrated, isAuthenticated, user, productId, router]);
 
   // Re-fetch categories if vendor switches product type while editing
   useEffect(() => {
     if (loading) return; // don't re-fetch during initial load
-    setForm((prev) => ({ ...prev, category: "" }));
     productApi.categories(form.product_type)
       .then((res) => setCategories(res.data))
       .catch(console.error);
@@ -286,7 +286,7 @@ export default function EditProductPage() {
             {PRODUCT_TYPES.map((t) => (
               <button
                 key={t.value}
-                onClick={() => set("product_type", t.value)}
+                onClick={() => setForm((prev) => ({ ...prev, product_type: t.value, category: "" }))}
                 className="p-3 rounded-xl text-center transition-all"
                 style={
                   form.product_type === t.value

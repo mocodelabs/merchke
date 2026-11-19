@@ -66,7 +66,7 @@ export default function BuyerProtectionPage() {
           Merchke Buyer Protection
         </h1>
         <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          Every purchase on Merchke is covered. Your money is held securely until you confirm you're happy — or we issue a refund.
+          Every purchase on Merchke is covered. Your money is held securely until you confirm you&apos;re happy — or we issue a refund.
         </p>
       </div>
 
@@ -120,7 +120,7 @@ export default function BuyerProtectionPage() {
       <div className="grid md:grid-cols-2 gap-5 mb-16">
         <div className="rounded-2xl p-6" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
           <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-            <span style={{ color: "#10b981" }}>✓</span> What's covered
+            <span style={{ color: "#10b981" }}>✓</span> What&apos;s covered
           </h3>
           <ul className="space-y-2.5">
             {ELIGIBLE.map((e) => (
@@ -133,7 +133,7 @@ export default function BuyerProtectionPage() {
         </div>
         <div className="rounded-2xl p-6" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
           <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-            <span style={{ color: "#f87171" }}>✕</span> What's not covered
+            <span style={{ color: "#f87171" }}>✕</span> What&apos;s not covered
           </h3>
           <ul className="space-y-2.5">
             {NOT_ELIGIBLE.map((e) => (
@@ -156,7 +156,7 @@ export default function BuyerProtectionPage() {
       >
         <h2 className="text-xl font-black text-white mb-3">Shop with confidence</h2>
         <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">
-          Every order on Merchke is protected. Browse, buy, and if anything goes wrong — we've got you.
+          Every order on Merchke is protected. Browse, buy, and if anything goes wrong — we&apos;ve got you.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link

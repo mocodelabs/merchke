@@ -1,27 +1,24 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import BannerAd from "@/components/BannerAd";
 import ProductCard from "@/components/ProductCard";
 import api from "@/lib/api";
+import { mediaUrl } from "@/lib/config";
+import { VENDOR_TYPES as VENDOR_TYPE_LIST } from "@/lib/constants";
 
-const VENDOR_TYPES = ["All", "Artists", "DJs", "Creatives", "Jerseys", "Brands", "Digital"];
+const VENDOR_TYPES = ["All", ...VENDOR_TYPE_LIST.map((t) => t.label)];
+const TYPE_ICON: Record<string, string> = Object.fromEntries(VENDOR_TYPE_LIST.map((t) => [t.label, t.icon]));
 const SORT_OPTIONS = ["Newest", "Best Selling", "Price: Low–High", "Price: High–Low", "Top Rated"];
 
-const TYPE_TO_API: Record<string, string> = {
-  Artists: "artist",
-  DJs: "dj",
-  Creatives: "creative",
-  Jerseys: "jersey",
-  Brands: "brand",
-  Digital: "digital",
-};
+const TYPE_TO_API: Record<string, string> = Object.fromEntries(VENDOR_TYPE_LIST.map((t) => [t.label, t.value]));
 
 const SORT_TO_API: Record<string, string> = {
   Newest: "-created_at",
   "Best Selling": "-sales_count",
   "Price: Low–High": "price",
   "Price: High–Low": "-price",
-  "Top Rated": "-average_rating",
+  "Top Rated": "-sales_count",
 };
 
 type ApiProduct = {
@@ -48,8 +45,8 @@ function toCard(p: ApiProduct): CardProduct {
   return {
     id: p.id,
     name: p.name,
-    price: p.effective_price,
-    image: p.image || "",
+    price: Number(p.effective_price),
+    image: mediaUrl(p.image),
     vendor: p.vendor_name,
     vendorSlug: p.vendor_slug,
     rating: p.average_rating,
@@ -58,7 +55,6 @@ function toCard(p: ApiProduct): CardProduct {
   };
 }
 
-import { Suspense } from "react";
 
 function StoreContent() {
   const searchParams = useSearchParams();
@@ -96,14 +92,16 @@ function StoreContent() {
           params.type = TYPE_TO_API[activeType];
         }
         if (search.trim()) params.search = search.trim();
+        if (priceMax < 10000) params.max_price = String(priceMax);
         if (productTypes.length === 1) params.product_type = productTypes[0];
 
         const res = await api.get("/products/", { params });
         let data: CardProduct[] = (res.data as ApiProduct[]).map(toCard);
 
         // client-side price + rating filters
-        if (priceMax < 10000) data = data.filter((p) => p.price <= priceMax);
+        if (priceMax < 10000) data = data.filter((p) => Number(p.price) <= priceMax);
         if (minRating > 0) data = data.filter((p) => p.rating >= minRating);
+        if (activeSort === "Top Rated") data = [...data].sort((a, b) => b.rating - a.rating);
 
         setProducts(data);
       } catch (err: unknown) {
@@ -132,10 +130,12 @@ function StoreContent() {
       </div>
 
       {/* Category tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0" role="tablist" aria-label="Seller type">
         {VENDOR_TYPES.map((t) => (
           <button
             key={t}
+            role="tab"
+            aria-selected={activeType === t}
             onClick={() => setActiveType(t)}
             className="shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all"
             style={
@@ -144,10 +144,13 @@ function StoreContent() {
                 : { background: "var(--surface)", border: "1px solid var(--border)", color: "#9ca3af" }
             }
           >
+            {TYPE_ICON[t] && <span className="mr-1" aria-hidden>{TYPE_ICON[t]}</span>}
             {t}
           </button>
         ))}
       </div>
+
+      <div className="mb-6"><BannerAd page="store" /></div>
 
       <div className="flex gap-6">
         {/* Sidebar — desktop */}

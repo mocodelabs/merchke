@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { vendorApi } from "@/lib/api";
+import { mediaUrl } from "@/lib/config";
 
 const TYPE_TABS = [
   { label: "All", value: "" },
@@ -31,12 +32,6 @@ type Vendor = {
   products_count: number;
 };
 
-function mediaUrl(path: string | null | undefined): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace("/api", "");
-  return `${base}${path}`;
-}
 
 export default function VendorsPage() {
   const [activeType, setActiveType] = useState("");

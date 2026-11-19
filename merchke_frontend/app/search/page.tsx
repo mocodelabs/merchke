@@ -3,12 +3,8 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { mediaUrl } from "@/lib/config";
 
-function mediaUrl(path: string | null | undefined) {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace("/api", "") + path;
-}
 
 type Product = {
   id: number; name: string; effective_price: number; image?: string;
@@ -152,9 +148,9 @@ function SearchContent() {
           <div className="flex items-center justify-between mb-5">
             <p className="text-sm text-gray-400">
               {totalResults === 0 ? (
-                <>No results for <span className="text-white font-semibold">"{q}"</span></>
+                <>No results for <span className="text-white font-semibold">&quot;{q}&quot;</span></>
               ) : (
-                <><span className="text-white font-semibold">{totalResults}</span> results for "{q}"</>
+                <><span className="text-white font-semibold">{totalResults}</span> results for &quot;{q}&quot;</>
               )}
             </p>
           </div>

@@ -14,7 +14,7 @@ export default function Footer() {
               Merch<span className="text-white">ke</span>
             </span>
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
-              Kenya's home for creatives. Buy merch, tickets and digital products from the artists and brands you love.
+              Kenya&apos;s home for creatives. Buy merch, tickets and digital products from the artists and brands you love.
             </p>
             <div className="flex gap-3 mt-4">
               {["twitter", "instagram", "tiktok"].map((s) => (
