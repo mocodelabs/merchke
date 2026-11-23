@@ -1,0 +1,63 @@
+# Runs Merchke's time-based housekeeping against the production database every 5 minutes:
+# expires unpaid listing/job fees (and emails vendors), auto-releases escrow, ends ads and boosts.
+# Replaces a Render Cron Job, which isn't available on Render's free plan.
+#
+# Needs repository secrets (Settings -> Secrets and variables -> Actions):
+#   DATABASE_URL (required) - the same Neon connection string Render uses
+#   EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL (optional;
+#   without EMAIL_HOST the vendor emails are only printed to this job's log)
+#
+# GitHub may start scheduled runs a few minutes late; the API applies the same rules when the
+# affected listing-fee and escrow records are read, so a late run causes no harm.
+name: Process due tasks
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: process-due-tasks
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: merchke_backend
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY || 'scheduled-task-runner' }}
+      DEBUG: "False"
+      FRONTEND_URL: https://merchke.netlify.app
+      EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+      EMAIL_PORT: ${{ secrets.EMAIL_PORT || '587' }}
+      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+      DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL || 'Merchke <no-reply@merchke.co.ke>' }}
+    steps:
+      # Without DATABASE_URL, Django falls back to a throwaway SQLite file and the run would
+      # "succeed" without touching production, so fail loudly instead.
+      - name: Check DATABASE_URL secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add the DATABASE_URL repository secret (the Neon connection string)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: merchke_backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - run: python manage.py process_due_tasks
