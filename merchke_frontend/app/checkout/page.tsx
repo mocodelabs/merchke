@@ -1,382 +1,263 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/components/CartProvider";
+import MpesaPaymentModal from "@/components/MpesaPaymentModal";
+import { orderApi, paymentApi } from "@/lib/api";
+import { useAuthStore } from "@/lib/authStore";
+import { apiErrorMessage, formatKES } from "@/lib/config";
+import type { MpesaTransaction, Order } from "@/lib/types";
 
-type PayStep = "details" | "payment" | "confirm" | "success";
-type PayMethod = "mpesa_stk" | "mpesa_paybill";
+const COUNTIES = [
+  "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Kiambu", "Machakos", "Kajiado", "Uasin Gishu", "Kilifi",
+  "Nyeri", "Meru", "Kakamega", "Kericho", "Embu", "Murang'a", "Laikipia", "Bungoma", "Other",
+];
+
+const inputClass = "w-full px-3 py-3 rounded-xl text-sm text-gray-200 placeholder-gray-600 outline-none focus:ring-1 focus:ring-orange-500";
+const inputStyle = { background: "var(--surface-2)", border: "1px solid var(--border)" };
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCart();
-  const [step, setStep] = useState<PayStep>("details");
-  const [payMethod, setPayMethod] = useState<PayMethod>("mpesa_stk");
-  const [phone, setPhone] = useState("0700");
-  const [loading, setLoading] = useState(false);
-  const [polling, setPolling] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    county: "",
-    town: "",
-    address: "",
-    deliveryPhone: "",
-  });
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
+  const router = useRouter();
 
-  const delivery = 200;
-  const grandTotal = total + delivery;
+  const [mode, setMode] = useState<"delivery" | "pickup">("delivery");
+  const [form, setForm] = useState({ county: "Nairobi", town: "", address: "", deliveryPhone: "", notes: "" });
+  const [phone, setPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [txn, setTxn] = useState<MpesaTransaction | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [chargedTotal, setChargedTotal] = useState(0);
 
-  const handleSTKPush = async () => {
-    setLoading(true);
-    // Simulate API call — replace with real axios call to /api/payments/mpesa/stk-push/
-    await new Promise((r) => setTimeout(r, 2000));
-    setLoading(false);
-    setPolling(true);
-    setStep("confirm");
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.replace("/login?next=/checkout");
+  }, [hasHydrated, isAuthenticated, router]);
+
+  const sellers = new Set(items.map((i) => i.vendor)).size;
+  const estimatedDelivery = mode === "delivery" ? 200 * sellers : 0;
+
+  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handlePay = async () => {
+    setError("");
+    if (mode === "delivery" && (!form.town.trim() || !form.address.trim())) {
+      setError("Add your town/estate and street address so the seller can deliver.");
+      return;
+    }
+    if (phone.replace(/\D/g, "").length < 9) {
+      setError("Enter the Safaricom number to pay with.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await orderApi.checkout({
+        items: items.map((i) => ({ product_id: i.id, variant_id: i.variantId ?? null, quantity: i.quantity })),
+        phone,
+        delivery_mode: mode,
+        delivery_address: form.address,
+        delivery_town: form.town,
+        delivery_county: form.county,
+        delivery_phone: form.deliveryPhone || phone,
+        notes: form.notes,
+      });
+      setOrders(res.data.orders);
+      setChargedTotal(Number(res.data.total));
+      setTxn(res.data.transaction);
+    } catch (err) {
+      setError(apiErrorMessage(err, "Checkout failed. Please try again."));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handlePollingDone = async () => {
-    setPolling(false);
-    // Simulate payment confirmed
-    await new Promise((r) => setTimeout(r, 1000));
-    setStep("success");
-    clearCart();
-  };
+  if (!isAuthenticated) return null;
 
-  if (step === "success") {
+  if (items.length === 0 && !txn) {
     return (
       <div className="max-w-lg mx-auto px-4 py-24 text-center">
-        <div
-          className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 glow-green"
-          style={{ background: "var(--accent-dim)", border: "2px solid var(--accent)" }}
-        >
-          ✓
-        </div>
-        <h1 className="text-3xl font-black text-white mb-3">Order Confirmed!</h1>
-        <p className="text-gray-400 mb-2">
-          Your payment was received via M-Pesa. You will receive an SMS confirmation shortly.
-        </p>
-        <p className="text-sm font-semibold mb-8" style={{ color: "var(--accent)" }}>
-          Order #MK{Math.random().toString(36).slice(2, 10).toUpperCase()}
-        </p>
-        <a
-          href="/"
-          className="inline-flex items-center justify-center px-8 py-4 rounded-xl font-bold text-white"
-          style={{ background: "var(--primary)" }}
-        >
-          Continue Shopping
-        </a>
+        <span className="text-6xl block mb-6" aria-hidden>🛒</span>
+        <h1 className="text-2xl font-bold text-white mb-3">Your cart is empty</h1>
+        <Link href="/store" className="inline-flex px-7 py-4 rounded-xl font-semibold text-white" style={{ background: "var(--primary)" }}>
+          Browse the store
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-black text-white mb-8">Checkout</h1>
-
-      {/* Progress */}
-      <div className="flex items-center gap-2 mb-10 text-sm">
-        {[
-          { id: "details", label: "Delivery" },
-          { id: "payment", label: "Payment" },
-          { id: "confirm", label: "Confirm" },
-        ].map((s, i) => {
-          const steps: PayStep[] = ["details", "payment", "confirm"];
-          const current = steps.indexOf(step);
-          const idx = steps.indexOf(s.id as PayStep);
-          const done = idx < current;
-          const active = idx === current;
-          return (
-            <div key={s.id} className="flex items-center gap-2">
-              {i > 0 && <div className="w-8 h-px" style={{ background: done ? "var(--primary)" : "var(--border)" }} />}
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                  style={
-                    done
-                      ? { background: "var(--primary)", color: "#fff" }
-                      : active
-                      ? { background: "var(--primary-dim)", color: "var(--primary)", border: "1px solid var(--primary)" }
-                      : { background: "var(--surface)", color: "#6b7280", border: "1px solid var(--border)" }
-                  }
-                >
-                  {done ? "✓" : i + 1}
-                </div>
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: active ? "var(--foreground)" : done ? "var(--primary)" : "#6b7280" }}
-                >
-                  {s.label}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <h1 className="text-3xl font-black text-white mb-2">Checkout</h1>
+      <p className="text-sm text-gray-500 mb-8 flex items-center gap-2">
+        <span aria-hidden>🛡️</span> Your money is held by Merchke until you confirm you received your order.
+      </p>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Form area */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Delivery */}
+          <section className="p-6 rounded-2xl space-y-5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <h2 className="text-lg font-bold text-white">1. Delivery</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {(["delivery", "pickup"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className="p-4 rounded-xl text-left transition-all"
+                  style={mode === m
+                    ? { background: "var(--primary-dim)", border: "2px solid var(--primary)" }
+                    : { background: "var(--surface-2)", border: "2px solid var(--border)" }}
+                >
+                  <span className="text-xl block mb-1" aria-hidden>{m === "delivery" ? "🚚" : "📍"}</span>
+                  <span className="text-sm font-semibold text-white block">{m === "delivery" ? "Deliver to me" : "I'll pick up"}</span>
+                  <span className="text-xs text-gray-500">{m === "delivery" ? "KSh 200 per seller" : "Arrange with the seller"}</span>
+                </button>
+              ))}
+            </div>
 
-          {/* Step 1: Delivery details */}
-          {step === "details" && (
-            <div
-              className="p-6 rounded-2xl space-y-5"
-              style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-            >
-              <h2 className="text-lg font-bold text-white">Delivery Details</h2>
-
+            {mode === "delivery" && (
               <div className="grid sm:grid-cols-2 gap-4">
-                {[
-                  { key: "name", label: "Full Name", placeholder: "John Kamau" },
-                  { key: "email", label: "Email", placeholder: "john@email.com" },
-                  { key: "county", label: "County", placeholder: "Nairobi" },
-                  { key: "town", label: "Town / Estate", placeholder: "Westlands" },
-                  { key: "deliveryPhone", label: "Delivery Phone", placeholder: "0700 000 000" },
-                ].map(({ key, label, placeholder }) => (
-                  <div key={key}>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">{label}</label>
-                    <input
-                      value={form[key as keyof typeof form]}
-                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                      placeholder={placeholder}
-                      className="w-full px-3 py-3 rounded-xl text-sm text-gray-200 placeholder-gray-600 outline-none transition-all"
-                      style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label htmlFor="county" className="block text-xs font-medium text-gray-400 mb-1.5">County</label>
+                  <select id="county" value={form.county} onChange={(e) => set("county", e.target.value)} className={inputClass} style={inputStyle}>
+                    {COUNTIES.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="town" className="block text-xs font-medium text-gray-400 mb-1.5">Town / Estate *</label>
+                  <input id="town" value={form.town} onChange={(e) => set("town", e.target.value)} placeholder="e.g. Kilimani" className={inputClass} style={inputStyle} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="address" className="block text-xs font-medium text-gray-400 mb-1.5">Street address / landmark *</label>
+                  <input id="address" value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="e.g. Ngong Road, opposite Prestige Plaza" className={inputClass} style={inputStyle} />
+                </div>
+                <div>
+                  <label htmlFor="dphone" className="block text-xs font-medium text-gray-400 mb-1.5">Delivery contact phone</label>
+                  <input id="dphone" type="tel" inputMode="tel" value={form.deliveryPhone} onChange={(e) => set("deliveryPhone", e.target.value)} placeholder="Same as M-Pesa number" className={inputClass} style={inputStyle} />
+                </div>
+                <div>
+                  <label htmlFor="notes" className="block text-xs font-medium text-gray-400 mb-1.5">Note to seller</label>
+                  <input id="notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Optional" className={inputClass} style={inputStyle} />
+                </div>
               </div>
+            )}
+          </section>
 
-              {/* Full-width address */}
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Street Address</label>
+          {/* Payment */}
+          <section className="p-6 rounded-2xl space-y-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <h2 className="text-lg font-bold text-white">2. Pay with M-Pesa</h2>
+            <div>
+              <label htmlFor="mpesa" className="block text-xs font-medium text-gray-400 mb-1.5">M-Pesa phone number</label>
+              <div className="flex items-center rounded-xl overflow-hidden" style={inputStyle}>
+                <span className="pl-3 text-sm text-gray-500 shrink-0">🇰🇪</span>
                 <input
-                  value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  placeholder="e.g. Ngong Road, near Shell Station"
-                  className="w-full px-3 py-3 rounded-xl text-sm text-gray-200 placeholder-gray-600 outline-none"
-                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+                  id="mpesa"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0712 345 678"
+                  className="flex-1 bg-transparent px-3 py-3 text-sm text-gray-200 placeholder-gray-600 outline-none"
                 />
               </div>
-
-              <button
-                onClick={() => setStep("payment")}
-                className="w-full py-4 rounded-xl font-bold text-white mt-2"
-                style={{ background: "var(--primary)" }}
-              >
-                Continue to Payment →
-              </button>
+              <p className="text-xs text-gray-600 mt-1.5">You&apos;ll get an STK prompt on this phone. Enter your PIN there — never share it.</p>
             </div>
-          )}
 
-          {/* Step 2: Payment */}
-          {step === "payment" && (
-            <div
-              className="p-6 rounded-2xl space-y-5"
-              style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-            >
-              <h2 className="text-lg font-bold text-white">Select Payment Method</h2>
-
-              {/* STK Push */}
-              <button
-                onClick={() => setPayMethod("mpesa_stk")}
-                className="w-full flex items-center gap-4 p-4 rounded-xl transition-all text-left"
-                style={
-                  payMethod === "mpesa_stk"
-                    ? { background: "var(--primary-dim)", border: "2px solid var(--primary)" }
-                    : { background: "var(--surface-2)", border: "2px solid var(--border)" }
-                }
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                  style={{ background: "var(--accent-dim)" }}
-                >
-                  📱
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-white text-sm">M-Pesa STK Push</p>
-                  <p className="text-xs text-gray-500">A payment prompt is sent directly to your phone</p>
-                </div>
-                <div
-                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                  style={{ borderColor: payMethod === "mpesa_stk" ? "var(--primary)" : "var(--border)" }}
-                >
-                  {payMethod === "mpesa_stk" && (
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--primary)" }} />
-                  )}
-                </div>
-              </button>
-
-              {/* PayBill */}
-              <button
-                onClick={() => setPayMethod("mpesa_paybill")}
-                className="w-full flex items-center gap-4 p-4 rounded-xl transition-all text-left"
-                style={
-                  payMethod === "mpesa_paybill"
-                    ? { background: "var(--primary-dim)", border: "2px solid var(--primary)" }
-                    : { background: "var(--surface-2)", border: "2px solid var(--border)" }
-                }
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                  style={{ background: "var(--primary-dim)" }}
-                >
-                  💳
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-white text-sm">M-Pesa PayBill / Till</p>
-                  <p className="text-xs text-gray-500">Pay to our PayBill number and enter the code</p>
-                </div>
-                <div
-                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                  style={{ borderColor: payMethod === "mpesa_paybill" ? "var(--primary)" : "var(--border)" }}
-                >
-                  {payMethod === "mpesa_paybill" && (
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--primary)" }} />
-                  )}
-                </div>
-              </button>
-
-              {/* Phone input for STK */}
-              {payMethod === "mpesa_stk" && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    M-Pesa Phone Number
-                  </label>
-                  <div
-                    className="flex items-center gap-2 rounded-xl overflow-hidden"
-                    style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-                  >
-                    <span className="pl-3 text-sm text-gray-500 shrink-0">+254</span>
-                    <input
-                      value={phone.replace(/^0/, "")}
-                      onChange={(e) => setPhone("0" + e.target.value.replace(/^0+/, ""))}
-                      placeholder="7XX XXX XXX"
-                      className="flex-1 bg-transparent px-2 py-3 text-sm text-gray-200 placeholder-gray-600 outline-none"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">You will receive an STK push on this number</p>
-                </div>
-              )}
-
-              {/* PayBill instructions */}
-              {payMethod === "mpesa_paybill" && (
-                <div
-                  className="p-4 rounded-xl text-sm space-y-2"
-                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-                >
-                  <p className="font-semibold text-white">How to pay via PayBill:</p>
-                  <ol className="text-gray-400 space-y-1 list-decimal list-inside text-xs">
-                    <li>Open M-Pesa on your phone</li>
-                    <li>Go to <strong className="text-white">Lipa na M-Pesa → Pay Bill</strong></li>
-                    <li>Business No: <strong className="text-white">123456</strong></li>
-                    <li>Account No: <strong className="text-white">MK-ORDER-ID</strong></li>
-                    <li>Amount: <strong style={{ color: "var(--primary)" }}>KSh {grandTotal.toLocaleString()}</strong></li>
-                  </ol>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setStep("details")}
-                  className="px-5 py-3.5 rounded-xl font-semibold text-sm text-gray-400 hover:text-white transition-all"
-                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={handleSTKPush}
-                  disabled={loading}
-                  className="flex-1 py-3.5 rounded-xl font-bold text-white text-sm transition-all disabled:opacity-60"
-                  style={{ background: "var(--primary)" }}
-                >
-                  {loading ? "Sending STK Push..." : payMethod === "mpesa_stk" ? `Pay KSh ${grandTotal.toLocaleString()} via M-Pesa` : "Confirm Order"}
-                </button>
+            {error && (
+              <div role="alert" className="p-3 rounded-xl text-sm" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
+                {error}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Step 3: Confirm / awaiting payment */}
-          {step === "confirm" && (
-            <div
-              className="p-6 rounded-2xl text-center"
-              style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+            <button
+              onClick={handlePay}
+              disabled={submitting}
+              className="w-full py-4 rounded-xl font-bold text-white disabled:opacity-60 glow-orange"
+              style={{ background: "var(--primary)" }}
             >
-              {polling ? (
-                <>
-                  <div
-                    className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-5 animate-pulse"
-                    style={{ background: "var(--accent-dim)" }}
-                  >
-                    📱
-                  </div>
-                  <h2 className="text-xl font-bold text-white mb-3">Check Your Phone</h2>
-                  <p className="text-gray-400 text-sm mb-6">
-                    An M-Pesa prompt has been sent to <strong className="text-white">{phone}</strong>. Enter your PIN to complete payment.
-                  </p>
-                  <div className="flex justify-center gap-2 mb-6">
-                    {[0, 1, 2].map((i) => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full animate-bounce"
-                        style={{ background: "var(--primary)", animationDelay: `${i * 0.2}s` }}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    onClick={handlePollingDone}
-                    className="px-8 py-3 rounded-xl font-semibold text-white text-sm"
-                    style={{ background: "var(--accent)" }}
-                  >
-                    I&apos;ve completed payment
-                  </button>
-                </>
-              ) : (
-                <p className="text-gray-400">Processing...</p>
-              )}
-            </div>
-          )}
+              {submitting ? "Sending M-Pesa prompt…" : `Pay ${formatKES(total + estimatedDelivery)} with M-Pesa`}
+            </button>
+          </section>
         </div>
 
-        {/* Order summary */}
-        <div className="lg:col-span-1">
-          <div
-            className="rounded-2xl p-5 sticky top-20"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-          >
-            <h3 className="text-base font-bold text-white mb-4">Order Summary</h3>
-            <div className="space-y-3 mb-4">
+        {/* Summary */}
+        <aside className="lg:col-span-1">
+          <div className="rounded-2xl p-5 lg:sticky lg:top-20" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <h3 className="text-base font-bold text-white mb-4">Order summary</h3>
+            <ul className="space-y-3 mb-4">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 text-sm">
-                  <div
-                    className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center"
-                    style={{ background: "var(--surface-2)" }}
-                  >
-                    🛍️
+                <li key={`${item.id}:${item.variantId ?? 0}`} className="flex items-center gap-3 text-sm">
+                  <div className="w-10 h-10 rounded-xl shrink-0 overflow-hidden flex items-center justify-center" style={{ background: "var(--surface-2)" }}>
+                    {item.image
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                      : <span aria-hidden>🛍️</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-gray-300 truncate">{item.name}</p>
-                    <p className="text-gray-600 text-xs">×{item.quantity}</p>
+                    <p className="text-gray-600 text-xs">{item.variant ? `${item.variant} · ` : ""}×{item.quantity}</p>
                   </div>
-                  <span className="text-white font-medium shrink-0">
-                    KSh {(item.price * item.quantity).toLocaleString()}
-                  </span>
-                </div>
+                  <span className="text-white font-medium shrink-0">{formatKES(item.price * item.quantity)}</span>
+                </li>
               ))}
-            </div>
+            </ul>
             <div className="space-y-2 pt-4 text-sm" style={{ borderTop: "1px solid var(--border)" }}>
+              <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatKES(total)}</span></div>
               <div className="flex justify-between text-gray-500">
-                <span>Subtotal</span><span>KSh {total.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-gray-500">
-                <span>Delivery</span><span>KSh {delivery}</span>
+                <span>Delivery</span><span>{mode === "delivery" ? `≈ ${formatKES(estimatedDelivery)}` : "Pickup"}</span>
               </div>
               <div className="flex justify-between font-bold text-base pt-2" style={{ borderTop: "1px solid var(--border)" }}>
                 <span className="text-white">Total</span>
-                <span style={{ color: "var(--primary)" }}>KSh {grandTotal.toLocaleString()}</span>
+                <span style={{ color: "var(--primary)" }}>{formatKES(total + estimatedDelivery)}</span>
               </div>
+              <p className="text-xs text-gray-600">Digital items ship free; the exact total is confirmed when you pay.</p>
             </div>
           </div>
-        </div>
+        </aside>
       </div>
+
+      <MpesaPaymentModal
+        open={txn !== null}
+        phone={txn?.phone ?? phone}
+        amount={chargedTotal}
+        title="Complete your payment"
+        description={orders.length > 1 ? `${orders.length} orders — one per seller, paid together.` : undefined}
+        check={async () => {
+          if (!txn) return { status: "pending" };
+          const { data } = await paymentApi.transaction(txn.id);
+          if (data.status === "completed") {
+            clearCart();
+            return { status: "paid" };
+          }
+          if (data.status === "failed") return { status: "failed", error: data.result_desc || "Payment was cancelled." };
+          return { status: "pending" };
+        }}
+        onRetry={async () => {
+          if (!txn) return;
+          const { data } = await paymentApi.retry(txn.id, phone);
+          setTxn(data);
+        }}
+        onClose={() => router.push(orders.length === 1 ? `/orders/${orders[0].id}` : "/orders")}
+        paidTitle="Order confirmed!"
+        paidBody={
+          <>
+            Thanks{user?.username ? `, ${user.username}` : ""}! Your money is safely held until you confirm delivery.
+            {orders.length > 0 && <span className="block mt-2 font-mono text-xs" style={{ color: "var(--accent)" }}>{orders.map((o) => o.order_number).join(" · ")}</span>}
+          </>
+        }
+        paidActions={
+          <>
+            <Link href={orders.length === 1 ? `/orders/${orders[0].id}` : "/orders"} className="w-full py-3.5 rounded-xl font-bold text-white text-center" style={{ background: "var(--primary)" }}>
+              Track my order
+            </Link>
+            <Link href="/store" className="w-full py-3 rounded-xl font-semibold text-sm text-gray-300 text-center" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              Keep shopping
+            </Link>
+          </>
+        }
+      />
     </div>
   );
 }

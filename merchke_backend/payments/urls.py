@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import MpesaSTKPushView, MpesaCallbackView, MpesaSTKQueryView
+from .views import MpesaCallbackView, PayOrderView, TransactionRetryView, TransactionStatusView
 
 urlpatterns = [
-    path('mpesa/stk-push/', MpesaSTKPushView.as_view(), name='mpesa-stk-push'),
     path('mpesa/callback/', MpesaCallbackView.as_view(), name='mpesa-callback'),
-    path('mpesa/query/', MpesaSTKQueryView.as_view(), name='mpesa-stk-query'),
+    path('transactions/<int:pk>/', TransactionStatusView.as_view(), name='mpesa-transaction-status'),
+    path('transactions/<int:pk>/retry/', TransactionRetryView.as_view(), name='mpesa-transaction-retry'),
+    path('orders/<int:order_id>/pay/', PayOrderView.as_view(), name='order-pay'),
 ]

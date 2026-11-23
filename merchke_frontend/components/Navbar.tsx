@@ -58,12 +58,14 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-sm font-medium">
           {[
             { href: "/store", label: "Shop" },
             { href: "/events", label: "Events" },
-            { href: "/vendors", label: "Vendors" },
-            { href: "/digital", label: "Digital" },
+            { href: "/football", label: "Football" },
+            { href: "/hire", label: "Hire" },
+            { href: "/jobs", label: "Jobs" },
+            { href: "/podcasts", label: "Podcasts" },
           ].map(({ href, label }) => (
             <Link
               key={href}
@@ -284,6 +286,10 @@ export default function Navbar() {
           {[
             { href: "/store", label: "Shop All" },
             { href: "/events", label: "Events & Tickets" },
+            { href: "/football", label: "Football ⚽" },
+            { href: "/hire", label: "Hire Creatives" },
+            { href: "/jobs", label: "Creative Jobs" },
+            { href: "/podcasts", label: "Podcasts" },
             { href: "/vendors", label: "Browse Vendors" },
             { href: "/digital", label: "Digital Downloads" },
             { href: "/how-it-works", label: "How It Works" },

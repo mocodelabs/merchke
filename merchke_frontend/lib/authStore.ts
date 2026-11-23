@@ -14,10 +14,16 @@ interface AuthState {
   user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
+  /**
+   * False during server render and React hydration (persisted state isn't read yet).
+   * Auth redirects must wait for this, or a hard refresh bounces logged-in users to /login.
+   */
+  hasHydrated: boolean;
 
   setAuth: (user: AuthUser, token: string) => void;
   logout: () => void;
   updateUser: (partial: Partial<AuthUser>) => void;
+  setHasHydrated: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -26,6 +32,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
+      hasHydrated: false,
 
       setAuth: (user, token) => {
         if (typeof window !== "undefined") {
@@ -46,6 +53,8 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           user: state.user ? { ...state.user, ...partial } : null,
         })),
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
     }),
     {
       name: "merchke-auth",
@@ -55,6 +64,7 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
     }
   )
 );

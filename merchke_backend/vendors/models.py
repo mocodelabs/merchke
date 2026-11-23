@@ -10,6 +10,9 @@ VENDOR_TYPE_CHOICES = [
     ('brand', 'Local Brand'),
     ('events', 'Events Organizer'),
     ('digital', 'Digital Products'),
+    ('makeup', 'Makeup Artist'),
+    ('tattoo', 'Tattoo Artist'),
+    ('biker', 'Biker / Moto Culture'),
     ('other', 'Other'),
 ]
 
@@ -34,6 +37,10 @@ class Vendor(models.Model):
 
     contact_email = models.EmailField()
     phone_number = models.CharField(max_length=20, blank=True)
+    mpesa_phone = models.CharField(
+        max_length=20, blank=True,
+        help_text='Safaricom number for listing fees and payouts',
+    )
     instagram_handle = models.CharField(max_length=100, blank=True)
     twitter_handle = models.CharField(max_length=100, blank=True)
     tiktok_handle = models.CharField(max_length=100, blank=True)

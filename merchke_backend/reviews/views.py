@@ -4,6 +4,7 @@ from .serializers import ProductReviewSerializer, VendorReviewSerializer
 
 
 class ProductReviewListCreateView(generics.ListCreateAPIView):
+    filter_backends = []
     serializer_class = ProductReviewSerializer
 
     def get_permissions(self):
@@ -19,6 +20,7 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
 
 
 class VendorReviewListCreateView(generics.ListCreateAPIView):
+    filter_backends = []
     serializer_class = VendorReviewSerializer
 
     def get_permissions(self):

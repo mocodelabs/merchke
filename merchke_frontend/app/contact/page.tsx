@@ -20,7 +20,7 @@ export default function ContactPage() {
         <span className="text-5xl block mb-4">✉️</span>
         <h1 className="text-3xl font-black text-white mb-3">Contact Us</h1>
         <p className="text-gray-400 text-sm max-w-md mx-auto">
-          Have a question, issue, or feedback? We're here to help. Typically reply within one business day.
+          Have a question, issue, or feedback? We&apos;re here to help. Typically reply within one business day.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ export default function ContactPage() {
             >
               <span className="text-5xl mb-4">🎉</span>
               <h3 className="text-lg font-bold text-white mb-2">Message sent!</h3>
-              <p className="text-sm text-gray-400">We'll get back to you at <strong className="text-white">{form.email}</strong> within one business day.</p>
+              <p className="text-sm text-gray-400">We&apos;ll get back to you at <strong className="text-white">{form.email}</strong> within one business day.</p>
             </div>
           ) : (
             <form

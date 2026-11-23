@@ -14,6 +14,9 @@ const VENDOR_TYPES = [
   { icon: "🏷️", label: "Local Brand", value: "brand", desc: "Clothing, accessories, lifestyle" },
   { icon: "🎟️", label: "Event Organizer", value: "events", desc: "Sell tickets for your events" },
   { icon: "📲", label: "Digital Products", value: "digital", desc: "Beats, presets, e-books, software" },
+  { icon: "💄", label: "Makeup Artist", value: "makeup", desc: "Products, bookings, tutorials" },
+  { icon: "🖋️", label: "Tattoo Artist", value: "tattoo", desc: "Flash art prints, booking deposits" },
+  { icon: "🏍️", label: "Biker / Moto Culture", value: "biker", desc: "Gear, accessories, ride tickets" },
 ];
 
 const COUNTIES = [
@@ -81,6 +84,8 @@ function OnboardingContent() {
       Object.entries(store).forEach(([k, v]) => fd.append(k, v));
       fd.append("payout_method", payout.payout_method);
       fd.append("payout_account", payout.payout_account);
+      // The M-Pesa payout number is also charged for listing fees.
+      if (payout.payout_method === "mpesa") fd.append("mpesa_phone", payout.payout_account);
       if (logoFile) fd.append("logo", logoFile);
 
       await vendorApi.updateProfile(fd);

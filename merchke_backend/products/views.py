@@ -1,27 +1,28 @@
 import os
-from rest_framework import generics, permissions, filters, status as drf_status
-from rest_framework.parsers import MultiPartParser, FormParser
+
+import django_filters
+from django.db import models as db_models
+from django.db import transaction
+from django.http import FileResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from rest_framework import filters, generics, permissions, status as drf_status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.http import FileResponse
-from django.db import models as db_models
-from django.shortcuts import get_object_or_404
-from .models import Category, Product, ProductVariant, Wishlist, Report
-from .serializers import CategorySerializer, ProductSerializer, ProductCreateSerializer, ProductVariantSerializer, WishlistSerializer
 
-
-class IsVendor(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return (
-            request.user and
-            request.user.is_authenticated and
-            request.user.is_vendor and
-            hasattr(request.user, 'vendor_profile')
-        )
+from core.permissions import IsVendor
+from payments.mpesa import MpesaError, normalize_phone
+from .models import Category, ListingFee, Product, ProductVariant, Report, Wishlist
+from .serializers import (
+    CategorySerializer, ListingFeeSerializer, ProductCreateSerializer, ProductSerializer,
+    ProductVariantSerializer, WishlistSerializer,
+)
+from .services import expire_if_stale, request_listing_fee
 
 
 class CategoryListView(generics.ListAPIView):
     serializer_class = CategorySerializer
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         qs = Category.objects.filter(is_active=True, parent=None).prefetch_related('subcategories')
@@ -31,10 +32,28 @@ class CategoryListView(generics.ListAPIView):
         return qs
 
 
+class ProductFilter(django_filters.FilterSet):
+    type = django_filters.CharFilter(field_name='vendor__vendor_type')
+    category = django_filters.CharFilter(field_name='category__slug')
+    vendor = django_filters.CharFilter(field_name='vendor__slug')
+    featured = django_filters.BooleanFilter(field_name='is_featured')
+    min_price = django_filters.NumberFilter(field_name='price', lookup_expr='gte')
+    max_price = django_filters.NumberFilter(field_name='price', lookup_expr='lte')
+
+    class Meta:
+        model = Product
+        fields = ['product_type', 'type', 'category', 'vendor', 'featured', 'min_price', 'max_price']
+
+
 class ProductListView(generics.ListCreateAPIView):
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['name', 'description', 'vendor__brand_name', 'category__name']
-    ordering_fields = ['price', 'created_at', 'sales_count', 'average_rating']
+    """
+    GET: public catalogue (?search=, ?type=, ?product_type=, ?category=, ?min_price= ...)
+    POST: vendor creates a product. It stays hidden until the KSh 130 listing
+    fee STK push is paid; the response carries the fee to poll.
+    """
+    filterset_class = ProductFilter
+    search_fields = ['name', 'description', 'short_description', 'vendor__brand_name', 'category__name']
+    ordering_fields = ['price', 'created_at', 'sales_count', 'views_count']
     ordering = ['-created_at']
     parser_classes = [MultiPartParser, FormParser]
 
@@ -49,23 +68,76 @@ class ProductListView(generics.ListCreateAPIView):
         return [permissions.AllowAny()]
 
     def get_queryset(self):
-        qs = Product.objects.filter(is_active=True).select_related('vendor', 'category')
-        vendor_type = self.request.query_params.get('type')
-        if vendor_type:
-            qs = qs.filter(vendor__vendor_type=vendor_type)
-        product_type = self.request.query_params.get('product_type')
-        if product_type:
-            qs = qs.filter(product_type=product_type)
-        category = self.request.query_params.get('category')
-        if category:
-            qs = qs.filter(category__slug=category)
-        featured = self.request.query_params.get('featured')
-        if featured:
-            qs = qs.filter(is_featured=True)
-        return qs
+        return Product.objects.filter(is_active=True).select_related('vendor', 'category') \
+            .prefetch_related('images', 'variants', 'reviews')
 
-    def perform_create(self, serializer):
-        serializer.save(vendor=self.request.user.vendor_profile)
+    def create(self, request, *args, **kwargs):
+        vendor = request.user.vendor_profile
+        raw_phone = request.data.get('mpesa_phone') or vendor.mpesa_phone or vendor.phone_number
+        try:
+            phone = normalize_phone(raw_phone)
+        except MpesaError:
+            return Response(
+                {'mpesa_phone': ['Enter the M-Pesa number to charge the KSh 130 listing fee.']},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            product = serializer.save(vendor=vendor, is_active=False)
+            if not vendor.mpesa_phone:
+                vendor.mpesa_phone = phone
+                vendor.save(update_fields=['mpesa_phone'])
+        fee = request_listing_fee(product, phone, request.user)
+        product.refresh_from_db()
+
+        data = dict(serializer.data)
+        data['is_active'] = product.is_active
+        data['listing_fee'] = ListingFeeSerializer(fee).data
+        return Response(data, status=drf_status.HTTP_201_CREATED)
+
+
+class ListingFeeStatusView(APIView):
+    """Vendor polls this every few seconds after creating a product."""
+    permission_classes = [permissions.IsAuthenticated, IsVendor]
+
+    def get(self, request, pk):
+        fee = get_object_or_404(
+            ListingFee.objects.select_related('product', 'vendor'),
+            product_id=pk, vendor=request.user.vendor_profile,
+        )
+        expire_if_stale(fee)
+        fee.refresh_from_db()
+        return Response(ListingFeeSerializer(fee).data)
+
+
+class ListingFeeRetryView(APIView):
+    """Resend the STK push for an unpaid / expired listing fee."""
+    permission_classes = [permissions.IsAuthenticated, IsVendor]
+
+    def post(self, request, pk):
+        product = get_object_or_404(Product, pk=pk, vendor=request.user.vendor_profile)
+        fee = getattr(product, 'listing_fee', None)
+        if fee is None or fee.status == 'paid':
+            return Response({'detail': 'This listing has no unpaid fee.'}, status=drf_status.HTTP_400_BAD_REQUEST)
+        try:
+            phone = normalize_phone(request.data.get('mpesa_phone') or fee.phone)
+        except MpesaError as exc:
+            return Response({'detail': str(exc)}, status=drf_status.HTTP_400_BAD_REQUEST)
+        fee = request_listing_fee(product, phone, request.user)
+        return Response(ListingFeeSerializer(fee).data)
+
+
+class VendorOwnProductListView(generics.ListAPIView):
+    """All of the authenticated vendor's products, including unpaid/hidden ones."""
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAuthenticated, IsVendor]
+
+    def get_queryset(self):
+        return Product.objects.filter(vendor=self.request.user.vendor_profile) \
+            .select_related('vendor', 'category', 'listing_fee') \
+            .prefetch_related('images', 'variants', 'reviews')
 
 
 class WishlistView(generics.ListCreateAPIView):
@@ -106,13 +178,13 @@ class ProductVariantCreateView(generics.CreateAPIView):
 
 
 class ProductDetailView(generics.RetrieveAPIView):
+    permission_classes = [permissions.AllowAny]
     queryset = Product.objects.filter(is_active=True).select_related('vendor', 'category')
     serializer_class = ProductSerializer
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        instance.views_count += 1
-        instance.save(update_fields=['views_count'])
+        Product.objects.filter(pk=instance.pk).update(views_count=db_models.F('views_count') + 1)
         return super().retrieve(request, *args, **kwargs)
 
 
@@ -149,6 +221,7 @@ class ProductVariantDetailView(generics.DestroyAPIView):
 class VendorProductListView(generics.ListAPIView):
     """Products belonging to a specific vendor slug."""
     serializer_class = ProductSerializer
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         slug = self.kwargs.get('vendor_slug')
@@ -195,7 +268,7 @@ class DigitalProductDownloadView(APIView):
         from orders.models import OrderItem
         order_item = OrderItem.objects.filter(
             order__user=request.user,
-            order__status__in=['pending', 'confirmed', 'processing', 'shipped', 'delivered'],
+            order__status__in=['confirmed', 'processing', 'shipped', 'delivered'],
             product=product,
         ).first()
 
@@ -214,8 +287,13 @@ class DigitalProductDownloadView(APIView):
         return self._serve(product)
 
     def _serve(self, product):
-        file_path = product.digital_file.path
-        if not os.path.exists(file_path):
-            return Response({'error': 'File not found on server'}, status=drf_status.HTTP_404_NOT_FOUND)
-        filename = os.path.basename(file_path)
-        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
+        f = product.digital_file
+        filename = os.path.basename(f.name)
+        try:
+            return FileResponse(f.open('rb'), as_attachment=True, filename=filename)
+        except (FileNotFoundError, NotImplementedError):
+            # Remote storage (Cloudinary): hand the client the file URL instead.
+            try:
+                return HttpResponseRedirect(f.url)
+            except Exception:
+                return Response({'error': 'File not found on server'}, status=drf_status.HTTP_404_NOT_FOUND)
