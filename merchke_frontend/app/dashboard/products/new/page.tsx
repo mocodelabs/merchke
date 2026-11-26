@@ -12,7 +12,8 @@ type Category = { id: number; name: string; slug: string; icon: string };
 type Variant = {
   id: string;
   size: string; color: string; custom_label: string;
-  price_modifier: string; stock: string; sku: string;
+  /** Full selling price for this option; blank means the product's price. */
+  price: string; stock: string; sku: string;
 };
 
 const DIGITAL_TYPES = [
@@ -74,7 +75,7 @@ export default function NewProductPage() {
   const addVariant = () =>
     setVariants((prev) => [
       ...prev,
-      { id: Math.random().toString(36).slice(2), size: "", color: "", custom_label: "", price_modifier: "0", stock: "", sku: "" },
+      { id: Math.random().toString(36).slice(2), size: "", color: "", custom_label: "", price: "", stock: "", sku: "" },
     ]);
 
   const removeVariant = (id: string) => setVariants((prev) => prev.filter((v) => v.id !== id));
@@ -158,7 +159,7 @@ export default function NewProductPage() {
               size: v.size || undefined,
               color: v.color || undefined,
               custom_label: v.custom_label || undefined,
-              price_modifier: v.price_modifier ? Number(v.price_modifier) : 0,
+              price_modifier: v.price !== "" ? Number(v.price) - Number(form.price) : 0,
               stock: v.stock ? Number(v.stock) : 0,
               sku: v.sku || undefined,
             })
@@ -544,12 +545,13 @@ export default function NewProductPage() {
                       />
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="text-xs text-gray-600 block mb-1">+/- Price (KSh)</label>
+                          <label className="text-xs text-gray-600 block mb-1">Price (KSh)</label>
                           <input
                             type="number"
-                            value={v.price_modifier}
-                            onChange={(e) => setVariantField(v.id, "price_modifier", e.target.value)}
-                            placeholder="0"
+                            min="0"
+                            value={v.price}
+                            onChange={(e) => setVariantField(v.id, "price", e.target.value)}
+                            placeholder={form.price || "Same as product"}
                             className={inputClass}
                             style={{ ...inputStyle, fontSize: "0.75rem" }}
                           />

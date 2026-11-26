@@ -4,6 +4,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { productApi, variantApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/authStore";
+import { apiErrorMessage } from "@/lib/config";
 
 type Category = { id: number; name: string; slug: string; icon: string };
 
@@ -16,7 +17,8 @@ type ExistingVariant = {
 type NewVariant = {
   _key: string;
   size: string; color: string; custom_label: string;
-  price_modifier: string; stock: string; sku: string;
+  /** Full selling price for this option; blank means the product's price. */
+  price: string; stock: string; sku: string;
 };
 
 const PRODUCT_TYPES = [
@@ -41,6 +43,21 @@ function formatBytes(bytes: number) {
 
 const inputClass = "w-full px-4 py-3 rounded-xl text-gray-200 outline-none placeholder-gray-600 text-sm transition-all focus:ring-1 focus:ring-orange-500";
 const inputStyle = { background: "var(--surface-2)", border: "1px solid var(--border)" };
+
+function toExistingVariants(variants: unknown): ExistingVariant[] {
+  return ((variants as Record<string, unknown>[] | undefined) ?? []).map((v) => ({
+    id: v.id as number,
+    size: (v.size as string) ?? "",
+    color: (v.color as string) ?? "",
+    custom_label: (v.custom_label as string) ?? "",
+    price_modifier: v.price_modifier != null ? String(v.price_modifier) : "0",
+    stock: (v.stock as number) ?? 0,
+    sku: (v.sku as string) ?? "",
+  }));
+}
+
+/** "1500.00" -> "1500", "1499.5" stays. */
+const priceText = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 100) / 100) : "");
 
 export default function EditProductPage() {
   const { isAuthenticated, user, hasHydrated } = useAuthStore();
@@ -82,6 +99,8 @@ export default function EditProductPage() {
   const [deletingVariantId, setDeletingVariantId] = useState<number | null>(null);
   // Stock typed for existing variants, saved with the rest of the form
   const [stockEdits, setStockEdits] = useState<Record<number, string>>({});
+  // Full prices typed for existing variants (stored server-side as a +/- on the product price)
+  const [priceEdits, setPriceEdits] = useState<Record<number, string>>({});
 
   // New variants to add
   const [newVariants, setNewVariants] = useState<NewVariant[]>([]);
@@ -110,17 +129,7 @@ export default function EditProductPage() {
         setExistingImageUrl(p.image || null);
         setExistingFileName(p.digital_file_name || null);
         if (p.download_limit) setDownloadLimit(String(p.download_limit));
-        setExistingVariants(
-          (p.variants ?? []).map((v: Record<string, unknown>) => ({
-            id: v.id as number,
-            size: (v.size as string) ?? "",
-            color: (v.color as string) ?? "",
-            custom_label: (v.custom_label as string) ?? "",
-            price_modifier: v.price_modifier != null ? String(v.price_modifier) : "0",
-            stock: (v.stock as number) ?? 0,
-            sku: (v.sku as string) ?? "",
-          }))
-        );
+        setExistingVariants(toExistingVariants(p.variants));
         // Load categories for the product's type
         return productApi.categories(pType);
       })
@@ -164,7 +173,7 @@ export default function EditProductPage() {
   const addNewVariant = () =>
     setNewVariants((prev) => [
       ...prev,
-      { _key: Math.random().toString(36).slice(2), size: "", color: "", custom_label: "", price_modifier: "0", stock: "", sku: "" },
+      { _key: Math.random().toString(36).slice(2), size: "", color: "", custom_label: "", price: form.price ? priceText(Number(form.price)) : "", stock: "", sku: "" },
     ]);
 
   const removeNewVariant = (key: string) =>
@@ -204,15 +213,31 @@ export default function EditProductPage() {
         data.append("download_limit", downloadLimit || "");
       }
 
-      await productApi.update(productId, data);
+      // Options first: they never involve uploads, so a failed image upload
+      // can't stop stock and prices from saving.
+      const basePrice = Number(form.price);
+      const variantUpdates = existingVariants.flatMap((v) => {
+        const patch: { stock?: number; price_modifier?: number } = {};
+        const stock = stockEdits[v.id];
+        if (stock !== undefined && stock !== "" && Number(stock) !== v.stock) {
+          patch.stock = Math.max(0, Math.floor(Number(stock)));
+        }
+        const price = priceEdits[v.id];
+        if (price !== undefined && price !== "") {
+          const modifier = Number(price) - basePrice;
+          if (modifier !== Number(v.price_modifier)) patch.price_modifier = modifier;
+        }
+        return Object.keys(patch).length ? [variantApi.update(productId, v.id, patch)] : [];
+      });
+      await Promise.all(variantUpdates);
+      setStockEdits({});
+      setPriceEdits({});
+      if (variantUpdates.length) {
+        const fresh = await productApi.getOwn(productId);
+        setExistingVariants(toExistingVariants(fresh.data.variants));
+      }
 
-      // Save restocked existing variants
-      const restocked = existingVariants.filter(
-        (v) => stockEdits[v.id] !== undefined && stockEdits[v.id] !== "" && Number(stockEdits[v.id]) !== v.stock
-      );
-      await Promise.all(
-        restocked.map((v) => variantApi.update(productId, v.id, { stock: Math.max(0, Number(stockEdits[v.id])) }))
-      );
+      await productApi.update(productId, data);
 
       // Add any new variants
       if (newVariants.length > 0) {
@@ -222,7 +247,7 @@ export default function EditProductPage() {
               size: v.size || undefined,
               color: v.color || undefined,
               custom_label: v.custom_label || undefined,
-              price_modifier: v.price_modifier ? Number(v.price_modifier) : 0,
+              price_modifier: v.price !== "" ? Number(v.price) - basePrice : 0,
               stock: v.stock ? Number(v.stock) : 0,
               sku: v.sku || undefined,
             })
@@ -233,14 +258,7 @@ export default function EditProductPage() {
       setSuccess(true);
       setTimeout(() => router.push("/dashboard?tab=products"), 1200);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: Record<string, string[]> } };
-      const msgs = axiosErr.response?.data;
-      if (msgs) {
-        const first = Object.values(msgs)[0];
-        setError(Array.isArray(first) ? first[0] : String(first));
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+      setError(apiErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -644,7 +662,7 @@ export default function EditProductPage() {
                     {deletingVariantId === v.id ? "Deleting…" : "Delete"}
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-gray-400 items-center">
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-400 items-center">
                   <label className="flex items-center gap-1.5">
                     Stock:
                     <input
@@ -657,7 +675,18 @@ export default function EditProductPage() {
                       aria-label={`Stock for ${[v.size, v.color, v.custom_label].filter(Boolean).join(" ") || "variant"}`}
                     />
                   </label>
-                  <span>+/- Price: <span className="text-white">KSh {v.price_modifier}</span></span>
+                  <label className="flex items-center gap-1.5">
+                    Price: KSh
+                    <input
+                      type="number"
+                      min="0"
+                      value={priceEdits[v.id] ?? priceText(Number(form.price) + Number(v.price_modifier))}
+                      onChange={(e) => setPriceEdits((prev) => ({ ...prev, [v.id]: e.target.value }))}
+                      className="w-20 px-2 py-1 rounded-lg bg-transparent text-white outline-none"
+                      style={{ border: "1px solid var(--border)" }}
+                      aria-label={`Price for ${[v.size, v.color, v.custom_label].filter(Boolean).join(" ") || "variant"}`}
+                    />
+                  </label>
                   {v.sku && <span>SKU: <span className="text-white">{v.sku}</span></span>}
                 </div>
               </div>
@@ -686,9 +715,9 @@ export default function EditProductPage() {
                   placeholder="Custom label (optional)" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="text-xs text-gray-600 block mb-1">+/- Price</label>
-                    <input type="number" value={v.price_modifier} onChange={(e) => setNewVariantField(v._key, "price_modifier", e.target.value)}
-                      placeholder="0" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
+                    <label className="text-xs text-gray-600 block mb-1">Price (KSh)</label>
+                    <input type="number" min="0" value={v.price} onChange={(e) => setNewVariantField(v._key, "price", e.target.value)}
+                      placeholder={form.price || "0"} className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
                   </div>
                   <div>
                     <label className="text-xs text-gray-600 block mb-1">Stock (each) *</label>

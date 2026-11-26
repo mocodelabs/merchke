@@ -162,3 +162,31 @@ class VariantSplitTests(TestCase):
         other = client_for(make_user('stranger', vendor=True))
         resp = other.patch(f'/api/products/{self.product.id}/variants/{variant.id}/', {'stock': 1}, format='json')
         self.assertEqual(resp.status_code, 404)
+
+
+class ProductImageUploadErrorTests(TestCase):
+    def setUp(self):
+        self.vendor_user = make_user('upload-vendor', vendor=True)
+        self.product = make_product(self.vendor_user.vendor_profile)
+        self.client = client_for(self.vendor_user)
+
+    def test_failed_cloud_upload_is_a_readable_400_not_a_500(self):
+        from cloudinary.exceptions import Error as CloudinaryError
+        from django.core.files.storage import FileSystemStorage
+
+        with mock.patch.object(FileSystemStorage, '_save', side_effect=CloudinaryError('Invalid Signature')):
+            resp = self.client.patch(
+                f'/api/products/{self.product.id}/manage/', {'image': image_file('tee.png')}, format='multipart',
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('Invalid Signature', resp.data['image'][0])
+
+    def test_oversized_image_is_rejected_with_a_message(self):
+        from .serializers import ProductCreateSerializer
+
+        with mock.patch.object(ProductCreateSerializer, 'MAX_IMAGE_BYTES', 10):
+            resp = self.client.patch(
+                f'/api/products/{self.product.id}/manage/', {'image': image_file('huge.png')}, format='multipart',
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('10 MB', resp.data['image'][0])
