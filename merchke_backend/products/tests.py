@@ -122,3 +122,43 @@ class CatalogueFilterTests(TestCase):
         OrderItem.objects.create(order=order, product=product, vendor=vendor, quantity=1, unit_price=1500)
         self.assertEqual(client_for(buyer).get(f'/api/products/{product.pk}/download/').status_code, 403)
         self.assertFalse(MpesaTransaction.objects.exists())
+
+
+class VariantSplitTests(TestCase):
+    def setUp(self):
+        self.vendor_user = make_user('kanga', vendor=True)
+        self.product = make_product(self.vendor_user.vendor_profile)
+        self.client = client_for(self.vendor_user)
+
+    def test_comma_separated_sizes_and_colours_become_one_variant_each(self):
+        resp = self.client.post(
+            f'/api/products/{self.product.id}/variants/',
+            {'size': 'S, M, XL', 'color': 'Color Black, Red', 'stock': 4, 'price_modifier': 0},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        combos = sorted(self.product.variants.values_list('size', 'color', 'stock'))
+        self.assertEqual(combos, sorted(
+            (s, c, 4) for s in ('S', 'M', 'XL') for c in ('Black', 'Red')
+        ))
+
+    def test_single_option_is_unchanged(self):
+        resp = self.client.post(
+            f'/api/products/{self.product.id}/variants/',
+            {'size': 'XL', 'color': 'Black & White', 'stock': 2}, format='json',
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data['size'], 'XL')
+        self.assertEqual(resp.data['color'], 'Black & White')
+
+    def test_vendor_can_restock_a_variant(self):
+        variant = self.product.variants.create(size='M', stock=0)
+        resp = self.client.patch(
+            f'/api/products/{self.product.id}/variants/{variant.id}/', {'stock': 7}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.data)
+        variant.refresh_from_db()
+        self.assertEqual(variant.stock, 7)
+        other = client_for(make_user('stranger', vendor=True))
+        resp = other.patch(f'/api/products/{self.product.id}/variants/{variant.id}/', {'stock': 1}, format='json')
+        self.assertEqual(resp.status_code, 404)

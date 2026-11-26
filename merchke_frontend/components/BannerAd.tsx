@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { adApi } from "@/lib/api";
 import { apiUrl, mediaUrl } from "@/lib/config";
 import type { Ad } from "@/lib/types";
+import MediaImage from "@/components/MediaImage";
 
 /** One paid banner for a category page. Renders nothing when no ad is live. */
 export default function BannerAd({ page }: { page: string }) {
@@ -23,8 +24,7 @@ export default function BannerAd({ page }: { page: string }) {
       className="group relative flex items-center gap-4 rounded-2xl overflow-hidden p-3 sm:p-4"
       style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={mediaUrl(ad.image)} alt="" loading="lazy" className="w-20 h-20 sm:w-28 sm:h-20 rounded-xl object-cover shrink-0" />
+      <MediaImage src={mediaUrl(ad.image)} alt="" loading="lazy" className="w-20 h-20 sm:w-28 sm:h-20 rounded-xl object-cover shrink-0" fallback={null} />
       <div className="min-w-0 flex-1">
         <p className="text-[10px] uppercase tracking-wider text-gray-600 font-semibold">Sponsored · {ad.vendor_name}</p>
         <p className="text-sm sm:text-base font-bold text-white truncate group-hover:text-orange-400 transition-colors">{ad.title}</p>

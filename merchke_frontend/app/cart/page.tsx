@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { cartKey, useCart } from "@/components/CartProvider";
 import { formatKES } from "@/lib/config";
+import MediaImage from "@/components/MediaImage";
 
 export default function CartPage() {
   const { items, removeItem, updateQty, total } = useCart();
@@ -47,7 +48,7 @@ export default function CartPage() {
               >
                 {item.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
+                  <MediaImage src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
                 ) : "🛍️"}
               </div>
 

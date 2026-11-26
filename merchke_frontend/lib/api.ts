@@ -170,6 +170,8 @@ export const variantApi = {
     size?: string; color?: string; custom_label?: string;
     price_modifier?: number; stock?: number; sku?: string;
   }) => api.post(`/products/${productId}/variants/`, data),
+  update: (productId: number, variantId: number, data: { stock?: number; price_modifier?: number }) =>
+    api.patch(`/products/${productId}/variants/${variantId}/`, data),
   delete: (productId: number, variantId: number) => api.delete(`/products/${productId}/variants/${variantId}/`),
 };
 

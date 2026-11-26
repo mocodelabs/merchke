@@ -5,6 +5,7 @@ import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { vendorApi, productApi } from "@/lib/api";
 import { mediaUrl } from "@/lib/config";
+import MediaImage from "@/components/MediaImage";
 
 const TYPE_EMOJI: Record<string, string> = {
   artist: "🎨", dj: "🎧", creative: "🎭",
@@ -98,7 +99,7 @@ export default function VendorStorePage() {
       {/* Banner */}
       <div className="h-52 md:h-64 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #1a0900 0%, #2d1200 50%, #1a0900 100%)" }}>
         {vendor.banner ? (
-          <img src={mediaUrl(vendor.banner)} alt="" className="w-full h-full object-cover opacity-60" />
+          <MediaImage src={mediaUrl(vendor.banner)} alt="" className="w-full h-full object-cover opacity-60" fallback={null} />
         ) : (
           <>
             <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(ellipse at center, var(--primary) 0%, transparent 70%)" }} />
@@ -117,7 +118,7 @@ export default function VendorStorePage() {
               style={{ background: "var(--surface)", border: "3px solid var(--background)" }}
             >
               {vendor.logo ? (
-                <img src={mediaUrl(vendor.logo)} alt={vendor.brand_name} className="w-full h-full object-cover" />
+                <MediaImage src={mediaUrl(vendor.logo)} alt={vendor.brand_name} fallback={emoji} />
               ) : (
                 <span>{emoji}</span>
               )}

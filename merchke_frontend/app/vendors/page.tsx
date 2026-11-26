@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { vendorApi } from "@/lib/api";
 import { mediaUrl } from "@/lib/config";
+import MediaImage from "@/components/MediaImage";
 
 const TYPE_TABS = [
   { label: "All", value: "" },
@@ -161,7 +162,7 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
             style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
           >
             {vendor.logo ? (
-              <img src={mediaUrl(vendor.logo)} alt={vendor.brand_name} className="w-full h-full object-cover" />
+              <MediaImage src={mediaUrl(vendor.logo)} alt={vendor.brand_name} fallback={emoji} />
             ) : (
               <span>{emoji}</span>
             )}

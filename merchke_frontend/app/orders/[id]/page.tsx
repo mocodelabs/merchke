@@ -10,6 +10,7 @@ import { useAuthStore } from "@/lib/authStore";
 import { apiErrorMessage, formatDateTime, formatKES, mediaUrl } from "@/lib/config";
 import { useFetch } from "@/lib/useFetch";
 import type { MpesaTransaction, Order, Ticket } from "@/lib/types";
+import MediaImage from "@/components/MediaImage";
 
 const STEPS: { key: Order["status"]; label: string }[] = [
   { key: "confirmed", label: "Paid" },
@@ -170,7 +171,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="w-14 h-14 rounded-xl shrink-0 overflow-hidden flex items-center justify-center" style={{ background: "var(--surface-2)" }}>
                   {item.product_image
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={mediaUrl(item.product_image)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    ? <MediaImage src={mediaUrl(item.product_image)} alt="" loading="lazy" className="w-full h-full object-cover" />
                     : <span aria-hidden>🛍️</span>}
                 </div>
                 <div className="flex-1 min-w-0">

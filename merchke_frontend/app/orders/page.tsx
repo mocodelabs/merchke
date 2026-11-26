@@ -7,6 +7,7 @@ import { orderApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/authStore";
 import { formatDate, formatKES, mediaUrl } from "@/lib/config";
 import type { Order } from "@/lib/types";
+import MediaImage from "@/components/MediaImage";
 
 export default function OrdersPage() {
   const { isAuthenticated, hasHydrated } = useAuthStore();
@@ -99,7 +100,7 @@ export default function OrdersPage() {
                       ? <span aria-hidden>🎟️</span>
                       : first?.product_image
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={mediaUrl(first.product_image)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                        ? <MediaImage src={mediaUrl(first.product_image)} alt="" loading="lazy" className="w-full h-full object-cover" />
                         : <span aria-hidden>🛍️</span>}
                   </div>
                   <div className="flex-1 min-w-0">

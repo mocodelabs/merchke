@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { mediaUrl } from "@/lib/config";
+import MediaImage from "@/components/MediaImage";
 
 
 type Product = {
@@ -209,7 +210,7 @@ function SearchContent() {
                       >
                         <div className="aspect-square relative overflow-hidden" style={{ background: "var(--surface-2)" }}>
                           {p.image ? (
-                            <img src={mediaUrl(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            <MediaImage src={mediaUrl(p.image)} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-4xl">🛍️</div>
                           )}
@@ -252,7 +253,7 @@ function SearchContent() {
                         >
                           <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0" style={{ background: "var(--surface-2)" }}>
                             {ev.banner_image ? (
-                              <img src={mediaUrl(ev.banner_image)} alt={ev.title} className="w-full h-full object-cover" />
+                              <MediaImage src={mediaUrl(ev.banner_image)} alt={ev.title} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-2xl">🎵</div>
                             )}
@@ -293,7 +294,7 @@ function SearchContent() {
                       >
                         <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-lg font-bold text-white" style={{ background: "var(--primary)" }}>
                           {v.logo ? (
-                            <img src={mediaUrl(v.logo)} alt={v.brand_name} className="w-full h-full object-cover" />
+                            <MediaImage src={mediaUrl(v.logo)} alt={v.brand_name} className="w-full h-full object-cover" />
                           ) : (
                             v.brand_name[0]
                           )}
