@@ -6,6 +6,7 @@ import { useCart } from "@/components/CartProvider";
 import { useAuthStore } from "@/lib/authStore";
 import api, { reviewApi, productApi, reportApi } from "@/lib/api";
 import { mediaUrl } from "@/lib/config";
+import MediaImage from "@/components/MediaImage";
 
 type ProductImage = { id: number; image: string; alt_text: string; is_primary: boolean };
 type ProductVariant = {
@@ -40,6 +41,28 @@ function StarRow({ rating, size = "w-4 h-4" }: { rating: number; size?: string }
   );
 }
 
+function OptionButton({ label, active, available, square = false, onClick }: {
+  label: string; active: boolean; available: boolean; square?: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={available ? undefined : "Out of stock"}
+      aria-label={available ? label : `${label} (out of stock)`}
+      className={`${square ? "min-w-12 h-12 px-3" : "h-10 px-4"} max-w-full rounded-xl text-sm font-semibold transition-all break-words ${available ? "" : "line-through opacity-50"}`}
+      style={
+        active
+          ? { background: "var(--primary)", color: "#fff", border: "2px solid var(--primary)" }
+          : { background: "var(--surface)", border: "2px solid var(--border)", color: "#9ca3af" }
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -50,7 +73,11 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<ApiProduct | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  // Size and colour are chosen independently; the variant is the one matching both.
+  // Products with only custom labels (e.g. Home Kit / Away Kit) pick a variant directly.
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedLabelVariant, setSelectedLabelVariant] = useState<ProductVariant | null>(null);
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [added, setAdded] = useState(false);
@@ -97,13 +124,35 @@ export default function ProductDetailPage() {
   const colors = [...new Set(product.variants.filter((v) => v.color).map((v) => v.color))];
   const hasCustomLabels = product.variants.length > 0 && !sizes.length && !colors.length;
 
+  const matches = (v: ProductVariant, size: string | null, color: string | null) =>
+    (size === null || v.size === size) && (color === null || v.color === color);
+  // An option is available if some in-stock variant has it, given the other choice made so far.
+  const sizeAvailable = (size: string) =>
+    product.variants.some((v) => matches(v, size, selectedColor) && v.stock > 0);
+  const colorAvailable = (color: string) =>
+    product.variants.some((v) => matches(v, selectedSize, color) && v.stock > 0);
+
+  const selectedVariant: ProductVariant | null = hasCustomLabels
+    ? selectedLabelVariant
+    : (sizes.length && !selectedSize) || (colors.length && !selectedColor)
+      ? null
+      : product.variants.find((v) => matches(v, sizes.length ? selectedSize : null, colors.length ? selectedColor : null)) ?? null;
+
   const effectivePrice = selectedVariant
     ? Number(product.effective_price) + Number(selectedVariant.price_modifier)
     : Number(product.effective_price);
 
   const handleAdd = () => {
     if (product.variants.length > 0 && !selectedVariant) {
-      alert("Please select a variant");
+      const missing = [
+        sizes.length && !selectedSize ? "a size" : "",
+        colors.length && !selectedColor ? "a colour" : "",
+      ].filter(Boolean).join(" and ");
+      alert(missing ? `Please choose ${missing}.` : hasCustomLabels ? "Please choose an option." : "That combination isn't available.");
+      return;
+    }
+    if (selectedVariant && selectedVariant.stock <= 0) {
+      alert("Sorry, that option is out of stock.");
       return;
     }
     addItem({
@@ -175,25 +224,17 @@ export default function ProductDetailPage() {
         <span>/</span>
         <Link href="/store" className="hover:text-white">Shop</Link>
         <span>/</span>
-        <span className="text-gray-400">{product.name}</span>
+        <span className="text-gray-400 truncate min-w-0">{product.name}</span>
       </nav>
 
-      <div className="grid lg:grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         {/* Image gallery */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <div
             className="aspect-square rounded-2xl flex items-center justify-center text-8xl relative overflow-hidden"
             style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
           >
-            {allImages[activeImg] ? (
-              <img
-                src={mediaUrl(allImages[activeImg])}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span>🛍️</span>
-            )}
+            <MediaImage src={allImages[activeImg] ? mediaUrl(allImages[activeImg]) : null} alt={product.name} loading="eager" />
             {product.discount_percent > 0 && (
               <span
                 className="absolute top-3 left-3 text-xs font-bold px-2.5 py-1 rounded-full"
@@ -215,9 +256,7 @@ export default function ProductDetailPage() {
                     border: `2px solid ${activeImg === i ? "var(--primary)" : "var(--border)"}`,
                   }}
                 >
-                  {img ? (
-                    <img src={mediaUrl(img)} alt="" className="w-full h-full object-cover" />
-                  ) : "🛍️"}
+                  <MediaImage src={img ? mediaUrl(img) : null} />
                 </button>
               ))}
             </div>
@@ -225,8 +264,8 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Product info */}
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <Link
               href={`/vendors/${product.vendor_slug}`}
               className="inline-flex items-center gap-2 text-sm font-medium hover:text-white transition-colors"
@@ -284,27 +323,19 @@ export default function ProductDetailPage() {
           {sizes.length > 0 && (
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-gray-300 mb-3">
-                Size{selectedVariant?.size ? `: ${selectedVariant.size}` : ""}
+                Size{selectedSize ? `: ${selectedSize}` : ""}
               </h3>
               <div className="flex flex-wrap gap-2">
-                {sizes.map((size) => {
-                  const v = product.variants.find((v) => v.size === size);
-                  const active = selectedVariant?.size === size;
-                  return (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedVariant(active ? null : v ?? null)}
-                      className="w-12 h-12 rounded-xl text-sm font-semibold transition-all"
-                      style={
-                        active
-                          ? { background: "var(--primary)", color: "#fff", border: "2px solid var(--primary)" }
-                          : { background: "var(--surface)", border: "2px solid var(--border)", color: "#9ca3af" }
-                      }
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
+                {sizes.map((size) => (
+                  <OptionButton
+                    key={size}
+                    label={size}
+                    active={selectedSize === size}
+                    available={sizeAvailable(size)}
+                    square
+                    onClick={() => setSelectedSize(selectedSize === size ? null : size)}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -313,27 +344,18 @@ export default function ProductDetailPage() {
           {colors.length > 0 && (
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-gray-300 mb-3">
-                Color{selectedVariant?.color ? `: ${selectedVariant.color}` : ""}
+                Colour{selectedColor ? `: ${selectedColor}` : ""}
               </h3>
               <div className="flex flex-wrap gap-2">
-                {colors.map((color) => {
-                  const v = product.variants.find((v) => v.color === color);
-                  const active = selectedVariant?.color === color;
-                  return (
-                    <button
-                      key={color}
-                      onClick={() => setSelectedVariant(active ? null : v ?? null)}
-                      className="px-4 h-10 rounded-xl text-sm font-semibold transition-all"
-                      style={
-                        active
-                          ? { background: "var(--primary)", color: "#fff", border: "2px solid var(--primary)" }
-                          : { background: "var(--surface)", border: "2px solid var(--border)", color: "#9ca3af" }
-                      }
-                    >
-                      {color}
-                    </button>
-                  );
-                })}
+                {colors.map((color) => (
+                  <OptionButton
+                    key={color}
+                    label={color}
+                    active={selectedColor === color}
+                    available={colorAvailable(color)}
+                    onClick={() => setSelectedColor(selectedColor === color ? null : color)}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -344,11 +366,11 @@ export default function ProductDetailPage() {
               <h3 className="text-sm font-semibold text-gray-300 mb-3">Select Option</h3>
               <div className="flex flex-wrap gap-2">
                 {product.variants.map((v) => {
-                  const active = selectedVariant?.id === v.id;
+                  const active = selectedLabelVariant?.id === v.id;
                   return (
                     <button
                       key={v.id}
-                      onClick={() => setSelectedVariant(active ? null : v)}
+                      onClick={() => setSelectedLabelVariant(active ? null : v)}
                       className="px-4 h-10 rounded-xl text-sm font-semibold transition-all"
                       style={
                         active

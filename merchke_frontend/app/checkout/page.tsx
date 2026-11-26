@@ -8,6 +8,7 @@ import { orderApi, paymentApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/authStore";
 import { apiErrorMessage, formatKES } from "@/lib/config";
 import type { MpesaTransaction, Order } from "@/lib/types";
+import MediaImage from "@/components/MediaImage";
 
 const COUNTIES = [
   "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Kiambu", "Machakos", "Kajiado", "Uasin Gishu", "Kilifi",
@@ -192,7 +193,7 @@ export default function CheckoutPage() {
                   <div className="w-10 h-10 rounded-xl shrink-0 overflow-hidden flex items-center justify-center" style={{ background: "var(--surface-2)" }}>
                     {item.image
                       // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                      ? <MediaImage src={item.image} alt="" loading="lazy" className="w-full h-full object-cover" />
                       : <span aria-hidden>🛍️</span>}
                   </div>
                   <div className="flex-1 min-w-0">

@@ -170,7 +170,7 @@ function StoreContent() {
           {/* Toolbar */}
           <div className="flex items-center justify-between gap-3 mb-5">
             <div
-              className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
+              className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
               <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,7 +180,7 @@ function StoreContent() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search products..."
-                className="bg-transparent outline-none flex-1 text-gray-300 placeholder-gray-600"
+                className="bg-transparent outline-none flex-1 min-w-0 w-full text-gray-300 placeholder-gray-600"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="text-gray-600 hover:text-gray-400">✕</button>
@@ -190,7 +190,8 @@ function StoreContent() {
             <select
               value={activeSort}
               onChange={(e) => setActiveSort(e.target.value)}
-              className="px-3 py-2 rounded-xl text-sm font-medium outline-none appearance-none cursor-pointer"
+              aria-label="Sort products"
+              className="shrink-0 max-w-[8.5rem] px-3 py-2 rounded-xl text-sm font-medium outline-none appearance-none cursor-pointer"
               style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "#d1d5db" }}
             >
               {SORT_OPTIONS.map((s) => (
@@ -200,7 +201,8 @@ function StoreContent() {
 
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 rounded-xl text-gray-400"
+              aria-label="Filters"
+              className="lg:hidden shrink-0 p-2 rounded-xl text-gray-400"
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

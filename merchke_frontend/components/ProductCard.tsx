@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "./CartProvider";
+import MediaImage from "./MediaImage";
 
 interface Product {
   id: number;
@@ -44,16 +45,12 @@ export default function ProductCard({ product }: { product: Product }) {
     >
       {/* Image */}
       <div className="relative aspect-square overflow-hidden" style={{ background: "var(--surface-2)" }}>
-        {image ? (
-          <img src={image} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-        ) : (
-          <div
-            className="absolute inset-0 flex items-center justify-center text-5xl"
-            style={{ background: "linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%)" }}
-          >
-            🛍️
-          </div>
-        )}
+        <MediaImage
+          src={image}
+          alt={name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          fallbackClassName="absolute inset-0 flex items-center justify-center text-5xl bg-gradient-to-br from-[var(--surface)] to-[var(--surface-2)]"
+        />
 
         {badge && badgeStyle && (
           <span

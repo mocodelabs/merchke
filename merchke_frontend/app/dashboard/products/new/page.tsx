@@ -523,14 +523,14 @@ export default function NewProductPage() {
                         <input
                           value={v.size}
                           onChange={(e) => setVariantField(v.id, "size", e.target.value)}
-                          placeholder="Size (S, M, L, XL…)"
+                          placeholder="Sizes, e.g. S, M, L"
                           className={inputClass}
                           style={{ ...inputStyle, fontSize: "0.75rem" }}
                         />
                         <input
                           value={v.color}
                           onChange={(e) => setVariantField(v.id, "color", e.target.value)}
-                          placeholder="Colour (Black, Red…)"
+                          placeholder="Colours, e.g. Black, Red"
                           className={inputClass}
                           style={{ ...inputStyle, fontSize: "0.75rem" }}
                         />
@@ -555,7 +555,7 @@ export default function NewProductPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-gray-600 block mb-1">Stock *</label>
+                          <label className="text-xs text-gray-600 block mb-1">Stock (each) *</label>
                           <input
                             type="number"
                             min="0"
@@ -580,6 +580,9 @@ export default function NewProductPage() {
                     </div>
                   ))}
 
+                  <p className="text-xs text-gray-500">
+                    Tip: list several sizes or colours separated by commas and each combination becomes its own option, with the stock you enter for each.
+                  </p>
                   <button
                     onClick={addVariant}
                     className="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-400 hover:text-white transition-colors flex items-center justify-center gap-2"

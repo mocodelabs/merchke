@@ -18,6 +18,7 @@ from .serializers import (
     ProductVariantSerializer, WishlistSerializer,
 )
 from .services import expire_if_stale, request_listing_fee
+from .variants import expand_variant_data
 
 
 class CategoryListView(generics.ListAPIView):
@@ -170,11 +171,33 @@ class ProductVariantCreateView(generics.CreateAPIView):
     serializer_class = ProductVariantSerializer
     permission_classes = [permissions.IsAuthenticated, IsVendor]
 
-    def perform_create(self, serializer):
+    MAX_COMBINATIONS = 60
+
+    def create(self, request, *args, **kwargs):
         product = get_object_or_404(
-            Product, id=self.kwargs['product_id'], vendor=self.request.user.vendor_profile
+            Product, id=self.kwargs['product_id'], vendor=request.user.vendor_profile
         )
-        serializer.save(product=product)
+        # "S, M, XL" + "Black, Red" becomes one variant per combination (see variants.py).
+        data = {key: request.data.get(key) for key in request.data}
+        items = list(expand_variant_data(
+            data,
+            ProductVariant._meta.get_field('size').max_length,
+            ProductVariant._meta.get_field('color').max_length,
+        ))
+        if len(items) > self.MAX_COMBINATIONS:
+            return Response(
+                {'detail': f'That makes {len(items)} size/colour combinations; the limit is '
+                           f'{self.MAX_COMBINATIONS}. Split it into fewer options.'},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+        serializers_ = [self.get_serializer(data=item) for item in items]
+        for serializer in serializers_:
+            serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            for serializer in serializers_:
+                serializer.save(product=product)
+        payload = [s.data for s in serializers_]
+        return Response(payload[0] if len(payload) == 1 else payload, status=drf_status.HTTP_201_CREATED)
 
 
 class ProductDetailView(generics.RetrieveAPIView):
@@ -204,10 +227,11 @@ class ProductOwnerView(generics.RetrieveUpdateAPIView):
         ).select_related('vendor', 'category').prefetch_related('images', 'variants', 'reviews')
 
 
-class ProductVariantDetailView(generics.DestroyAPIView):
-    """DELETE a variant that belongs to the requesting vendor."""
+class ProductVariantDetailView(generics.UpdateAPIView, generics.DestroyAPIView):
+    """PATCH (e.g. restock) or DELETE a variant that belongs to the requesting vendor."""
     serializer_class = ProductVariantSerializer
     permission_classes = [permissions.IsAuthenticated, IsVendor]
+    http_method_names = ['patch', 'delete', 'options']
 
     def get_object(self):
         return get_object_or_404(

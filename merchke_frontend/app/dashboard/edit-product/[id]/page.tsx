@@ -80,6 +80,8 @@ export default function EditProductPage() {
   // Existing variants (from server)
   const [existingVariants, setExistingVariants] = useState<ExistingVariant[]>([]);
   const [deletingVariantId, setDeletingVariantId] = useState<number | null>(null);
+  // Stock typed for existing variants, saved with the rest of the form
+  const [stockEdits, setStockEdits] = useState<Record<number, string>>({});
 
   // New variants to add
   const [newVariants, setNewVariants] = useState<NewVariant[]>([]);
@@ -203,6 +205,14 @@ export default function EditProductPage() {
       }
 
       await productApi.update(productId, data);
+
+      // Save restocked existing variants
+      const restocked = existingVariants.filter(
+        (v) => stockEdits[v.id] !== undefined && stockEdits[v.id] !== "" && Number(stockEdits[v.id]) !== v.stock
+      );
+      await Promise.all(
+        restocked.map((v) => variantApi.update(productId, v.id, { stock: Math.max(0, Number(stockEdits[v.id])) }))
+      );
 
       // Add any new variants
       if (newVariants.length > 0) {
@@ -634,8 +644,19 @@ export default function EditProductPage() {
                     {deletingVariantId === v.id ? "Deleting…" : "Delete"}
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-gray-400">
-                  <span>Stock: <span className="text-white">{v.stock}</span></span>
+                <div className="grid grid-cols-3 gap-2 text-xs text-gray-400 items-center">
+                  <label className="flex items-center gap-1.5">
+                    Stock:
+                    <input
+                      type="number"
+                      min="0"
+                      value={stockEdits[v.id] ?? String(v.stock)}
+                      onChange={(e) => setStockEdits((prev) => ({ ...prev, [v.id]: e.target.value }))}
+                      className="w-16 px-2 py-1 rounded-lg bg-transparent text-white outline-none"
+                      style={{ border: `1px solid ${v.stock === 0 && stockEdits[v.id] === undefined ? "#f87171" : "var(--border)"}` }}
+                      aria-label={`Stock for ${[v.size, v.color, v.custom_label].filter(Boolean).join(" ") || "variant"}`}
+                    />
+                  </label>
                   <span>+/- Price: <span className="text-white">KSh {v.price_modifier}</span></span>
                   {v.sku && <span>SKU: <span className="text-white">{v.sku}</span></span>}
                 </div>
@@ -657,9 +678,9 @@ export default function EditProductPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input value={v.size} onChange={(e) => setNewVariantField(v._key, "size", e.target.value)}
-                    placeholder="Size (S, M, L…)" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
+                    placeholder="Sizes, e.g. S, M, L" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
                   <input value={v.color} onChange={(e) => setNewVariantField(v._key, "color", e.target.value)}
-                    placeholder="Colour (Black…)" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
+                    placeholder="Colours, e.g. Black, Red" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
                 </div>
                 <input value={v.custom_label} onChange={(e) => setNewVariantField(v._key, "custom_label", e.target.value)}
                   placeholder="Custom label (optional)" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
@@ -670,7 +691,7 @@ export default function EditProductPage() {
                       placeholder="0" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-600 block mb-1">Stock *</label>
+                    <label className="text-xs text-gray-600 block mb-1">Stock (each) *</label>
                     <input type="number" min="0" value={v.stock} onChange={(e) => setNewVariantField(v._key, "stock", e.target.value)}
                       placeholder="0" className={inputClass} style={{ ...inputStyle, fontSize: "0.75rem" }} />
                   </div>

@@ -6,6 +6,7 @@ import { wishlistApi } from "@/lib/api";
 import { useAuthStore } from "@/lib/authStore";
 import { useCart } from "@/components/CartProvider";
 import { mediaUrl } from "@/lib/config";
+import MediaImage from "@/components/MediaImage";
 
 
 type WishlistItem = {
@@ -144,7 +145,7 @@ export default function WishlistPage() {
                   {/* Image */}
                   <Link href={`/products/${p.id}`} className="block relative aspect-square overflow-hidden" style={{ background: "var(--surface-2)" }}>
                     {p.image ? (
-                      <img
+                      <MediaImage
                         src={mediaUrl(p.image)}
                         alt={p.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
