@@ -38,9 +38,15 @@ export function formatDateTime(iso: string) {
 
 /** Pull a human message out of a DRF error response. */
 export function apiErrorMessage(err: unknown, fallback = "Something went wrong. Please try again."): string {
-  const data = (err as { response?: { data?: unknown } })?.response?.data;
+  const res = (err as { response?: { status?: number; data?: unknown } })?.response;
+  const data = res?.data;
+  if (res?.status && res.status >= 500) return "The server hit an error. Please try again in a moment.";
   if (!data) return fallback;
-  if (typeof data === "string") return data.length < 200 ? data : fallback;
+  if (typeof data === "string") {
+    // Error pages (HTML) and blank bodies are not messages a person can read.
+    const text = data.trim();
+    return text && !text.startsWith("<") && text.length < 200 ? text : fallback;
+  }
   if (typeof data === "object") {
     const record = data as Record<string, unknown>;
     if (typeof record.detail === "string") return record.detail;

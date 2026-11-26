@@ -1,5 +1,11 @@
+import logging
+
+from cloudinary.exceptions import Error as CloudinaryError
 from rest_framework import serializers
+
 from .models import Category, ListingFee, Product, ProductImage, ProductVariant, Wishlist
+
+logger = logging.getLogger(__name__)
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
@@ -14,6 +20,23 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'digital_file', 'download_limit',
         ]
         read_only_fields = ['id']
+
+    # Cloudinary's free plan rejects images over 10 MB.
+    MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+    def validate_image(self, value):
+        if value and getattr(value, 'size', 0) > self.MAX_IMAGE_BYTES:
+            raise serializers.ValidationError('Image must be 10 MB or smaller. Try a smaller or compressed photo.')
+        return value
+
+    def save(self, **kwargs):
+        # A failed upload to Cloudinary (bad CLOUDINARY_URL, file rejected) would
+        # otherwise surface as a bare 500 page the dashboard can't explain.
+        try:
+            return super().save(**kwargs)
+        except CloudinaryError as exc:
+            logger.exception('File upload to Cloudinary failed')
+            raise serializers.ValidationError({'image': [f'Upload failed: {exc}']}) from exc
 
     def validate_is_active(self, value):
         # New listings only go live once the listing fee is paid.
