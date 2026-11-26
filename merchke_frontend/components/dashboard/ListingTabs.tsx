@@ -75,8 +75,8 @@ export function EventsTab() {
 }
 
 function BoostModal({ event, onClose }: { event: MerchEvent; onClose: () => void }) {
-  const [budget, setBudget] = useState("1000");
-  const [days, setDays] = useState("7");
+  const [packages, setPackages] = useState<{ days: number; price_ksh: number }[]>([]);
+  const [days, setDays] = useState(7);
   const [copy, setCopy] = useState("");
   const [phone, setPhone] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -87,13 +87,15 @@ function BoostModal({ event, onClose }: { event: MerchEvent; onClose: () => void
 
   useEffect(() => {
     vendorApi.getProfile().then((r) => setPhone((p) => p || r.data.mpesa_phone)).catch(() => {});
+    eventApi.boostPackages().then((r) => setPackages(r.data)).catch(() => setError("Couldn't load boost prices. Close and try again."));
   }, []);
 
+  const price = packages.find((p) => p.days === days)?.price_ksh ?? 0;
+
   const submit = async () => {
-    if (Number(budget) < 500) return setError("Boosts start at KSh 500.");
+    if (!price) return setError("Choose a boost package.");
     const data = new FormData();
-    data.append("budget_ksh", budget);
-    data.append("days", days);
+    data.append("days", String(days));
     data.append("ad_copy", copy);
     data.append("phone", phone);
     if (image) data.append("ad_image", image);
@@ -114,7 +116,7 @@ function BoostModal({ event, onClose }: { event: MerchEvent; onClose: () => void
       <MpesaPaymentModal
         open
         phone={txn.phone}
-        amount={budget}
+        amount={price}
         title={`Boost "${event.title}"`}
         check={async () => {
           const { data } = await paymentApi.transaction(txn.id);
@@ -138,16 +140,31 @@ function BoostModal({ event, onClose }: { event: MerchEvent; onClose: () => void
           <h2 id="boost-title" className="text-lg font-black text-white">Boost your event</h2>
           <p className="text-xs text-gray-500">Featured on the homepage carousel and at the top of events.</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-gray-400">Budget (KSh)
-            <input type="number" min={500} value={budget} onChange={(e) => setBudget(e.target.value)} className={`${inputClass} mt-1`} style={inputStyle} />
-          </label>
-          <label className="text-xs text-gray-400">Days
-            <select value={days} onChange={(e) => setDays(e.target.value)} className={`${inputClass} mt-1`} style={inputStyle}>
-              {[3, 7, 14, 30].map((d) => <option key={d} value={d}>{d} days</option>)}
-            </select>
-          </label>
-        </div>
+        <fieldset>
+          <legend className="text-xs text-gray-400 mb-2">Choose how long</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {packages.map((p) => {
+              const selected = p.days === days;
+              return (
+                <button
+                  key={p.days}
+                  type="button"
+                  onClick={() => setDays(p.days)}
+                  aria-pressed={selected}
+                  className="p-3 rounded-xl text-left transition-all"
+                  style={{
+                    background: selected ? "var(--primary-dim)" : "var(--surface-2)",
+                    border: `1px solid ${selected ? "var(--primary)" : "var(--border)"}`,
+                  }}
+                >
+                  <span className="block text-sm font-bold text-white">{p.days} days</span>
+                  <span className="block text-base font-black" style={{ color: "var(--primary)" }}>{formatKES(p.price_ksh)}</span>
+                  <span className="block text-[11px] text-gray-500">{formatKES(Math.round(p.price_ksh / p.days))} / day</span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
         <label className="block text-xs text-gray-400">Ad line
           <input value={copy} maxLength={200} onChange={(e) => setCopy(e.target.value)} placeholder="e.g. Early bird ends Friday!" className={`${inputClass} mt-1`} style={inputStyle} />
         </label>
@@ -163,8 +180,8 @@ function BoostModal({ event, onClose }: { event: MerchEvent; onClose: () => void
         <FormError message={error} />
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-3 rounded-xl text-sm font-semibold text-gray-300" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>Cancel</button>
-          <button onClick={submit} disabled={submitting} className="flex-1 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-60" style={{ background: "var(--primary)" }}>
-            {submitting ? "Sending…" : `Pay ${formatKES(budget)}`}
+          <button onClick={submit} disabled={submitting || !price} className="flex-1 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-60" style={{ background: "var(--primary)" }}>
+            {submitting ? "Sending…" : price ? `Pay ${formatKES(price)}` : "Loading prices…"}
           </button>
         </div>
       </div>

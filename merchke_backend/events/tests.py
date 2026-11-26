@@ -73,17 +73,22 @@ class TicketTests(TestCase):
 
     def test_boost_features_event(self):
         resp = client_for(self.organizer).post(f'/api/events/{self.event.pk}/boost/', {
-            'budget_ksh': 1000, 'days': 5, 'ad_copy': 'Early bird ends Friday', 'phone': '0712345678',
+            'budget_ksh': 1, 'days': 7, 'ad_copy': 'Early bird ends Friday', 'phone': '0712345678',
             'ad_image': image_file(),
         }, format='multipart')
         self.assertEqual(resp.status_code, 201, resp.data)
+        # The package sets the price; a budget sent by the client is ignored.
+        self.assertEqual(resp.data['boost']['budget_ksh'], 1000)
+        self.assertEqual(resp.data['transaction']['amount'], '1000.00')
         self.event.refresh_from_db()
         self.assertTrue(self.event.is_featured)
         ads = client_for().get('/api/events/featured-ads/').data
         self.assertEqual(len(ads), 1)
         self.assertEqual(client_for(self.organizer).post(
-            f'/api/events/{self.event.pk}/boost/', {'budget_ksh': 100, 'phone': '0712345678'},
+            f'/api/events/{self.event.pk}/boost/', {'days': 5, 'phone': '0712345678'},
         ).status_code, 400)
+        packages = client_for().get('/api/events/boost-packages/').data
+        self.assertEqual([p['days'] for p in packages], [3, 7, 14, 30])
 
     @override_settings(MPESA_SIMULATE=False)
     @mock.patch('payments.services.send_stk_push', return_value=('ws_T', 'm'))

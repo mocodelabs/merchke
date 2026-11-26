@@ -19,7 +19,7 @@ from .serializers import (
     EventAdSerializer, EventCreateSerializer, EventSerializer, TicketSerializer,
     TicketTypeCreateSerializer, TicketTypeSerializer,
 )
-from .services import TicketError, start_boost, start_ticket_purchase
+from .services import BOOST_PACKAGES, TicketError, start_boost, start_ticket_purchase
 
 
 class EventFilter(django_filters.FilterSet):
@@ -244,7 +244,8 @@ class TicketVerifyView(APIView):
 # ── Boosts ─────────────────────────────────────────────────────────────────────
 
 class EventBoostView(APIView):
-    """Organizer pays to feature their event: {budget_ksh, days, ad_copy, ad_image?, phone}."""
+    """Organizer pays to feature their event: {days, ad_copy, ad_image?, phone}.
+    The price comes from the chosen package (services.BOOST_PACKAGES)."""
     permission_classes = [IsAuthenticated, IsVendor]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
@@ -253,7 +254,6 @@ class EventBoostView(APIView):
         try:
             ad, txn = start_boost(
                 user=request.user, event=event,
-                budget_ksh=int(request.data.get('budget_ksh', 0)),
                 days=int(request.data.get('days', 7)),
                 ad_copy=request.data.get('ad_copy', '')[:200],
                 ad_image=request.data.get('ad_image') or None,
@@ -262,11 +262,19 @@ class EventBoostView(APIView):
         except (TicketError, MpesaError) as exc:
             return Response({'detail': str(exc)}, status=drf_status.HTTP_400_BAD_REQUEST)
         except (TypeError, ValueError):
-            return Response({'detail': 'Budget and days must be numbers.'}, status=drf_status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Days must be a number.'}, status=drf_status.HTTP_400_BAD_REQUEST)
         return Response({
             'boost': EventAdSerializer(ad).data,
             'transaction': MpesaTransactionSerializer(txn).data,
         }, status=drf_status.HTTP_201_CREATED)
+
+
+class BoostPackagesView(APIView):
+    """The fixed boost packages organizers choose from."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response([{'days': days, 'price_ksh': price} for days, price in BOOST_PACKAGES.items()])
 
 
 class FeaturedEventAdsView(generics.ListAPIView):
