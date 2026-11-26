@@ -12,7 +12,9 @@ from .models import Event, EventAd, Ticket, TicketType
 
 logger = logging.getLogger(__name__)
 
-MIN_BOOST_KSH = 500
+# Fixed boost packages: days featured -> price in KSh. Organizers pick one,
+# they don't name a budget. Longer runs cost less per day. Edit here to reprice.
+BOOST_PACKAGES = {3: 500, 7: 1000, 14: 1800, 30: 3500}
 
 
 class TicketError(Exception):
@@ -102,12 +104,14 @@ def on_tickets_paid(txn):
         Event.objects.filter(pk=event.pk).update(status='sold_out')
 
 
-def start_boost(*, user, event, budget_ksh, days, ad_copy, ad_image, phone):
-    if budget_ksh < MIN_BOOST_KSH:
-        raise TicketError(f'The minimum boost budget is KSh {MIN_BOOST_KSH}.')
+def start_boost(*, user, event, days, ad_copy, ad_image, phone):
+    budget_ksh = BOOST_PACKAGES.get(days)
+    if budget_ksh is None:
+        options = ', '.join(str(d) for d in BOOST_PACKAGES)
+        raise TicketError(f'Choose a boost package: {options} days.')
     with transaction.atomic():
         ad = EventAd.objects.create(
-            event=event, budget_ksh=budget_ksh, days=max(1, min(days, 60)),
+            event=event, budget_ksh=budget_ksh, days=days,
             ad_copy=ad_copy, ad_image=ad_image,
         )
         txn = initiate_payment(

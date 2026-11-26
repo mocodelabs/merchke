@@ -5,6 +5,7 @@ urlpatterns = [
     path('', views.EventListCreateView.as_view(), name='event-list'),
     path('mine/', views.EventOwnerListView.as_view(), name='event-mine'),
     path('featured-ads/', views.FeaturedEventAdsView.as_view(), name='event-featured-ads'),
+    path('boost-packages/', views.BoostPackagesView.as_view(), name='event-boost-packages'),
     path('<int:pk>/manage/', views.EventOwnerDetailView.as_view(), name='event-manage'),
     path('<int:pk>/purchase-tickets/', views.PurchaseTicketsView.as_view(), name='event-purchase-tickets'),
     path('<int:pk>/boost/', views.EventBoostView.as_view(), name='event-boost'),

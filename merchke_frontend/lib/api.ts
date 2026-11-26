@@ -141,6 +141,7 @@ export const eventApi = {
   boost: (eventId: number, data: FormData) =>
     api.post<{ boost: unknown; transaction: MpesaTransaction }>(`/events/${eventId}/boost/`, data, multipart),
   featuredAds: () => api.get("/events/featured-ads/"),
+  boostPackages: () => api.get<{ days: number; price_ksh: number }[]>("/events/boost-packages/"),
 };
 
 export const ticketTypeApi = {
