@@ -5,7 +5,7 @@ import { formatKES } from "@/lib/config";
 import MediaImage from "@/components/MediaImage";
 
 export default function CartPage() {
-  const { items, removeItem, updateQty, total } = useCart();
+  const { items, removeItem, updateQty, total, count } = useCart();
 
   if (items.length === 0) {
     return (
@@ -29,7 +29,7 @@ export default function CartPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-black text-white mb-8">
-        Your Cart ({items.reduce((s, i) => s + i.quantity, 0)} items)
+        Your Cart ({count} {count === 1 ? "item" : "items"})
       </h1>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -47,7 +47,6 @@ export default function CartPage() {
                 style={{ background: "var(--surface-2)" }}
               >
                 {item.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <MediaImage src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
                 ) : "🛍️"}
               </div>
@@ -55,7 +54,7 @@ export default function CartPage() {
               {/* Details */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-sm font-semibold text-white">{item.name}</h3>
                     <p className="text-xs text-gray-500 mt-0.5">{item.vendor}</p>
                     {item.variant && (
@@ -69,11 +68,15 @@ export default function CartPage() {
                   </div>
                   <button
                     onClick={() => removeItem(cartKey(item))}
-                    className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                    aria-label={`Remove ${item.name}${item.variant ? ` (${item.variant})` : ""} from cart`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                    style={{ border: "1px solid rgba(248,113,113,0.3)" }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                     </svg>
+                    <span>Remove</span>
                   </button>
                 </div>
 
